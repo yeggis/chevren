@@ -71,7 +71,8 @@ def cmd_setup():
     print("Chevren kurulum sihirbazı\n")
     cfg = config.load()
 
-    key = input(f"Gemini API key [{cfg.get('gemini_api_key') or 'boş'}]: ").strip()
+    import getpass
+    key = getpass.getpass(f"Gemini API key [{cfg.get('gemini_api_key') or 'boş'}]: ").strip()    
     if key:
         cfg["gemini_api_key"] = key
 
