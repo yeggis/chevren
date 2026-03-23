@@ -3,6 +3,7 @@ pipeline.py — chevren ana pipeline
 YouTube URL veya yerel dosya → Türkçe SRT
 """
 import gc
+import time
 import subprocess
 import sys
 from pathlib import Path
@@ -83,16 +84,23 @@ def _translate(srt_en: str) -> str:
             "Output ONLY the translated SRT.\n\n"
             + _blocks_to_srt(chunk)
         )
-        try:
-            tr_text  = client.models.generate_content(model=model_name, contents=prompt).text.strip()
-            tr_text  = tr_text.replace("```srt", "").replace("```", "").strip()
-            tr_chunk = _parse_srt(tr_text)
-            while len(tr_chunk) < len(chunk):
-                tr_chunk.append(chunk[len(tr_chunk)])
-            tr_all.extend(tr_chunk)
-        except Exception as e:
-            print(f"  Chunk {ci} hatası: {e}")
-            tr_all.extend(chunk)
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                tr_text  = client.models.generate_content(model=model_name, contents=prompt).text.strip()
+                tr_text  = tr_text.replace("```srt", "").replace("```", "").strip()
+                tr_chunk = _parse_srt(tr_text)
+                while len(tr_chunk) < len(chunk):
+                    tr_chunk.append(chunk[len(tr_chunk)])
+                tr_all.extend(tr_chunk)
+                break
+            except Exception as e:
+                print(f"  Chunk {ci} hatası (deneme {attempt+1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(5 * (attempt + 1))
+                else:
+                    print(f"  Chunk {ci} atlandı, İngilizce bırakıldı.")
+                    tr_all.extend(chunk)
     return _blocks_to_srt(tr_all)
 
 def _extract_video_id(source: str) -> str:
