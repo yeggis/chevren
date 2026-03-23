@@ -1,13 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import os
-
-# lib klasörü (pip ile kurulu paketler)
-lib_path = "/usr/share/chevren/lib"
-if os.path.exists(lib_path):
-    existing = os.environ.get("PYTHONPATH", "")
-    if lib_path not in existing:
-        os.environ["PYTHONPATH"] = f"{lib_path}:{existing}"
+import glob
 
 # CUDA kütüphaneleri için path
 cuda_lib = "/opt/cuda/targets/x86_64-linux/lib"
@@ -16,16 +10,16 @@ if cuda_lib not in ld_path:
     os.environ["LD_LIBRARY_PATH"] = f"{cuda_lib}:{ld_path}"
     os.execv(sys.executable, [sys.executable] + sys.argv)
 
-# Kurulum konumuna göre src path
-script_path = os.path.realpath(__file__)
+# venv site-packages
+venv_site = glob.glob("/usr/share/chevren/venv/lib/python3.*/site-packages")
+if venv_site:
+    sys.path.insert(0, venv_site[0])
+
+# src path
 if os.path.exists("/usr/share/chevren/src"):
     sys.path.insert(0, "/usr/share/chevren/src")
 else:
-    sys.path.insert(0, os.path.join(os.path.dirname(script_path), 'src'))
-
-# lib klasörü sys.path'e de ekle
-if os.path.exists(lib_path):
-    sys.path.insert(0, lib_path)
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), 'src'))
 
 from cli import main
 main()

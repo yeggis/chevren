@@ -13,7 +13,7 @@ depends=(
   'yt-dlp'
   'mpv'
 )
-makedepends=('python-pip')
+makedepends=('python-pip' 'python-virtualenv')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/yeggis/$pkgname/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('bbd01faf270d3a4fb68b15e3986b6db37b0db64117ba2705b8f3009e5a52fdc0')
 
@@ -24,10 +24,10 @@ package() {
   install -dm755 "$pkgdir/usr/share/$pkgname"
   cp -r src "$pkgdir/usr/share/$pkgname/"
 
-  # Python bağımlılıkları
-  install -dm755 "$pkgdir/usr/share/$pkgname/lib"
-  pip install faster-whisper google-genai yt-dlp \
-    --target "$pkgdir/usr/share/$pkgname/lib" \
+  # venv oluştur ve bağımlılıkları kur
+  python -m venv "$pkgdir/usr/share/$pkgname/venv"
+  "$pkgdir/usr/share/$pkgname/venv/bin/pip" install \
+    faster-whisper google-genai \
     --no-compile \
     --quiet
 
