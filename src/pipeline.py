@@ -66,15 +66,15 @@ def _transcribe(wav: Path) -> str:
     return "\n".join(lines)
 
 def _translate(srt_en: str) -> str:
-    import google.generativeai as genai
+    from google import genai
     api_key = config.get("gemini_api_key")
     if not api_key:
         raise ValueError("Gemini API key eksik. 'chevren setup' ile ekleyin.")
-    genai.configure(api_key=api_key)
-    model     = genai.GenerativeModel(config.get("gemini_model"))
-    blocks    = _parse_srt(srt_en)
-    chunks    = [blocks[i:i + CHUNK_SIZE] for i in range(0, len(blocks), CHUNK_SIZE)]
-    tr_all    = []
+    client     = genai.Client(api_key=api_key)
+    model_name = config.get("gemini_model")
+    blocks     = _parse_srt(srt_en)
+    chunks     = [blocks[i:i + CHUNK_SIZE] for i in range(0, len(blocks), CHUNK_SIZE)]
+    tr_all     = []
     for ci, chunk in enumerate(chunks, 1):
         print(f"  Çeviri: {ci}/{len(chunks)}")
         prompt = (
@@ -84,7 +84,7 @@ def _translate(srt_en: str) -> str:
             + _blocks_to_srt(chunk)
         )
         try:
-            tr_text  = model.generate_content(prompt).text.strip()
+            tr_text  = client.models.generate_content(model=model_name, contents=prompt).text.strip()
             tr_text  = tr_text.replace("```srt", "").replace("```", "").strip()
             tr_chunk = _parse_srt(tr_text)
             while len(tr_chunk) < len(chunk):
