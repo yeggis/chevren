@@ -72,7 +72,8 @@ def cmd_setup():
     cfg = config.load()
 
     import getpass
-    key = getpass.getpass(f"Gemini API key [{cfg.get('gemini_api_key') or 'boş'}]: ").strip()    
+    existing = "●●●●●●●●" if cfg.get('gemini_api_key') else 'boş'
+    key = getpass.getpass(f"Gemini API key [{existing}]: ").strip()
     if key:
         cfg["gemini_api_key"] = key
 
