@@ -9,6 +9,12 @@ if cuda_lib not in ld_path:
     os.environ["LD_LIBRARY_PATH"] = f"{cuda_lib}:{ld_path}"
     os.execv(sys.executable, [sys.executable] + sys.argv)
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# Kurulum konumuna göre src path
+script_path = os.path.realpath(__file__)
+if os.path.exists("/usr/share/chevren/src"):
+    sys.path.insert(0, "/usr/share/chevren/src")
+else:
+    sys.path.insert(0, os.path.join(os.path.dirname(script_path), 'src'))
+
 from cli import main
 main()
