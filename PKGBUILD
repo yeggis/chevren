@@ -31,6 +31,10 @@ package() {
     --no-compile \
     --quiet
 
+  # venv shebang'ini düzelt
+  find "$pkgdir/usr/share/$pkgname/venv/bin" -type f \
+    -exec sed -i "s|$pkgdir||g" {} \; 2>/dev/null || true
+
   # Çalıştırılabilir script
   install -Dm755 chevren "$pkgdir/usr/share/$pkgname/chevren"
 
