@@ -77,10 +77,10 @@ def cmd_setup():
     if key:
         cfg["gemini_api_key"] = key
 
-    model = input(f"Whisper modeli [{cfg.get('whisper_model')}]: ").strip()
-    if model:
-        cfg["whisper_model"] = model
-
+    detected = config.detect_hardware()["whisper_model"]
+    current  = cfg.get('whisper_model', detected)
+    model    = input(f"Whisper modeli [{detected} önerilen, şu an: {current}]: ").strip()
+    cfg["whisper_model"] = model if model else detected
     player = input(f"Oynatıcı [{cfg.get('player', 'mpv')}]: ").strip()
     if player:
         cfg["player"] = player
