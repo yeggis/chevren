@@ -1,4 +1,3 @@
-# chevren — ayar yönetimi
 """
 config.py — chevren ayar yönetimi
 """
