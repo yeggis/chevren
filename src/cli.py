@@ -120,10 +120,13 @@ def cmd_run(source: str, no_play: bool):
 
     player = config.get("player") or "mpv"
     try:
-        if source.startswith("http"):
-            subprocess.Popen([player, source, f"--sub-file={srt}", "--sub-visibility=yes"])
-        else:
-            subprocess.Popen([player, source, f"--sub-file={srt}", "--sub-visibility=yes"])
+        subprocess.Popen(
+            [player, source, f"--sub-file={srt}", "--sub-visibility=yes"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
+        )
         print(f"▶ {player} açıldı")
     except FileNotFoundError:
         print(f"mpv bulunamadı. SRT: {srt}")
