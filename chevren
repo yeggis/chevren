@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 import sys
 import os
+
+# CUDA kütüphaneleri için path
+cuda_lib = "/opt/cuda/targets/x86_64-linux/lib"
+ld_path = os.environ.get("LD_LIBRARY_PATH", "")
+if cuda_lib not in ld_path:
+    os.environ["LD_LIBRARY_PATH"] = f"{cuda_lib}:{ld_path}"
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 from cli import main
 main()
