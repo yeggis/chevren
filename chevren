@@ -2,6 +2,13 @@
 import sys
 import os
 
+# lib klasörü (pip ile kurulu paketler)
+lib_path = "/usr/share/chevren/lib"
+if os.path.exists(lib_path):
+    existing = os.environ.get("PYTHONPATH", "")
+    if lib_path not in existing:
+        os.environ["PYTHONPATH"] = f"{lib_path}:{existing}"
+
 # CUDA kütüphaneleri için path
 cuda_lib = "/opt/cuda/targets/x86_64-linux/lib"
 ld_path = os.environ.get("LD_LIBRARY_PATH", "")
@@ -15,6 +22,10 @@ if os.path.exists("/usr/share/chevren/src"):
     sys.path.insert(0, "/usr/share/chevren/src")
 else:
     sys.path.insert(0, os.path.join(os.path.dirname(script_path), 'src'))
+
+# lib klasörü sys.path'e de ekle
+if os.path.exists(lib_path):
+    sys.path.insert(0, lib_path)
 
 from cli import main
 main()

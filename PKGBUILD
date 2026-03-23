@@ -15,7 +15,7 @@ depends=(
 )
 makedepends=('python-pip')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/yeggis/$pkgname/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('9755124664337052b45e582f434f4937618099ef687f018e2b30773d9cb4f409')
+sha256sums=('d274edcff5c25d3b27c0825ed3ac5dafc1621ed88a7ba61836e1d99cf54eb917')
 
 package() {
   cd "$srcdir/$pkgname-$pkgver"
@@ -23,6 +23,13 @@ package() {
   # Ana dizin
   install -dm755 "$pkgdir/usr/share/$pkgname"
   cp -r src "$pkgdir/usr/share/$pkgname/"
+
+  # Python bağımlılıkları
+  install -dm755 "$pkgdir/usr/share/$pkgname/lib"
+  pip install faster-whisper google-genai yt-dlp \
+    --target "$pkgdir/usr/share/$pkgname/lib" \
+    --no-compile \
+    --quiet
 
   # Çalıştırılabilir script
   install -Dm755 chevren "$pkgdir/usr/share/$pkgname/chevren"
