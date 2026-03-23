@@ -28,6 +28,8 @@ package() {
   python -m venv "$pkgdir/usr/share/$pkgname/venv"
   "$pkgdir/usr/share/$pkgname/venv/bin/pip" install \
     faster-whisper google-genai \
+    "urllib3>=2.0" \
+    "charset-normalizer>=3.0" \
     --no-compile \
     --quiet
 
