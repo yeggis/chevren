@@ -15,7 +15,7 @@ depends=(
 )
 makedepends=('python-pip')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/yeggis/$pkgname/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('4f52819ff14948519c27e6b32dd06e1d08dfd29f78688e054158dd5188846702')
+sha256sums=('9755124664337052b45e582f434f4937618099ef687f018e2b30773d9cb4f409')
 
 package() {
   cd "$srcdir/$pkgname-$pkgver"
