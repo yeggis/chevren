@@ -1,7 +1,7 @@
 # Maintainer: yeggis <yeggis@users.noreply.github.com>
 pkgname=chevren
 pkgver=1.0.4
-pkgrel=3
+pkgrel=1
 pkgdesc="Turkish subtitle generator for YouTube videos and local files"
 arch=('x86_64')
 url="https://github.com/yeggis/chevren"
