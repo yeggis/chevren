@@ -121,7 +121,8 @@ def cmd_run(source: str, no_play: bool):
             return
         try:
             subprocess.Popen(
-                [player, source, f"--sub-file={srt_path}", "--sub-visibility=yes"],
+                [player, source, f"--sub-file={srt_path}", "--sub-visibility=yes",
+                 "--input-ipc-server=/tmp/chevren-mpv-socket"],
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,

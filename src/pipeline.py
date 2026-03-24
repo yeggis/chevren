@@ -6,6 +6,7 @@ import gc
 import time
 import subprocess
 import sys
+import socket
 from pathlib import Path
 
 APP_DIR = Path(__file__).parent.resolve()
@@ -137,6 +138,16 @@ def _append_srt(srt_path: Path, blocks: list[dict]) -> None:
         for b in blocks:
             f.write(f"{b['num']}\n{b['ts']}\n{b['text']}\n\n")
 
+def _reload_mpv_subs():
+    """mpv'ye altyazıyı yeniden yüklemesini söyler."""
+    try:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.connect("/tmp/chevren-mpv-socket")
+        sock.sendall(b'{ "command": ["sub-reload"] }\n')
+        sock.close()
+    except Exception:
+        pass  # mpv henüz açılmamış olabilir, sessizce geç
+
 
 def _extract_video_id(source: str) -> str:
     if source.startswith("http"):
@@ -246,6 +257,7 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
             translated = _translate_chunk(client, model_name, pending, chunk_num, exhausted_models)
             translated = _renumber(translated, blk_count + 1)
             _append_srt(srt_path, translated)
+            _reload_mpv_subs()
             blk_count += len(translated)
             pending.clear()
 
@@ -261,7 +273,7 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
         translated = _translate_chunk(client, model_name, pending, chunk_num, exhausted_models)
         translated = _renumber(translated, blk_count + 1)
         _append_srt(srt_path, translated)
-
+        _reload_mpv_subs()
     del model
     gc.collect()
 
