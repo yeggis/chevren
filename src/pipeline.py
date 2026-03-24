@@ -56,6 +56,11 @@ def _extract_audio(source: str, workdir: Path) -> Path:
         subprocess.run(["ffmpeg", "-y", "-i", source, "-ar", "16000", "-ac", "1", str(wav)], check=True)
     return wav
 
+GEMINI_FALLBACK_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-3-flash",
+]
 
 def _translate_chunk(client, model_name: str, blocks: list[dict], chunk_index: int) -> list[dict]:
     """Bir segment grubunu Türkçe'ye çevirir, hata durumunda retry yapar."""
@@ -65,27 +70,34 @@ def _translate_chunk(client, model_name: str, blocks: list[dict], chunk_index: i
         "Output ONLY the translated SRT.\n\n"
         + _blocks_to_srt(blocks)
     )
+    models_to_try = [model_name] + [m for m in GEMINI_FALLBACK_MODELS if m != model_name]
     max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            tr_text  = client.models.generate_content(model=model_name, contents=prompt).text.strip()
-            tr_text  = tr_text.replace("```srt", "").replace("```", "").strip()
-            tr_chunk = _parse_srt(tr_text)
-            while len(tr_chunk) < len(blocks):
-                tr_chunk.append(blocks[len(tr_chunk)])
-            return tr_chunk
-        except Exception as e:
-            print(f"  Chunk {chunk_index} hatası (deneme {attempt+1}/{max_retries}): {e}")
-            if attempt < max_retries - 1:
-                import re
-                match = re.search(r'retryDelay.*?(\d+)s', str(e))
-                wait = int(match.group(1)) + 2 if match else 5 * (attempt + 1)
-                print(f"  {wait} saniye bekleniyor...")
-                time.sleep(wait)
-            else:
-                print(f"  Chunk {chunk_index} atlandı, İngilizce bırakıldı.")
-                return blocks
-
+    for model in models_to_try:
+        for attempt in range(max_retries):
+            try:
+                tr_text = client.models.generate_content(model=model, contents=prompt).text.strip()
+                tr_text = tr_text.replace("```srt", "").replace("```", "").strip()
+                tr_chunk = _parse_srt(tr_text)
+                while len(tr_chunk) < len(blocks):
+                    tr_chunk.append(blocks[len(tr_chunk)])
+                return tr_chunk
+            except Exception as e:
+                err = str(e)
+                is_quota = "429" in err or "RESOURCE_EXHAUSTED" in err
+                print(f"  Chunk {chunk_index} hatası [{model}] (deneme {attempt+1}/{max_retries}): {e}")
+                if is_quota:
+                    print(f"  Kota doldu, sonraki modele geçiliyor...")
+                    break
+                if attempt < max_retries - 1:
+                    import re
+                    match = re.search(r'retryDelay.*?(\d+)s', err)
+                    wait = int(match.group(1)) + 2 if match else 5 * (attempt + 1)
+                    print(f"  {wait} saniye bekleniyor...")
+                    time.sleep(wait)
+                else:
+                    break
+    print(f"  Chunk {chunk_index} tüm modeller denendi, İngilizce bırakıldı.")
+    return blocks
 
 def _translate(srt_en: str) -> str:
     """Eski toplu çeviri — geriye dönük uyumluluk için korundu."""
