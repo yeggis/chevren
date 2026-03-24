@@ -62,15 +62,21 @@ GEMINI_FALLBACK_MODELS = [
     "gemini-3-flash",
 ]
 
-def _translate_chunk(client, model_name: str, blocks: list[dict], chunk_index: int) -> list[dict]:
+def _translate_chunk(client, model_name: str, blocks: list[dict], chunk_index: int, exhausted_models: set = None) -> list[dict]:
     """Bir segment grubunu Türkçe'ye çevirir, hata durumunda retry yapar."""
+    if exhausted_models is None:
+        exhausted_models = set()
     prompt = (
         "Translate English SRT to Turkish. "
         "Keep timestamps and numbers exactly. "
         "Output ONLY the translated SRT.\n\n"
         + _blocks_to_srt(blocks)
     )
-    models_to_try = [model_name] + [m for m in GEMINI_FALLBACK_MODELS if m != model_name]
+    all_models = [model_name] + [m for m in GEMINI_FALLBACK_MODELS if m != model_name]
+    models_to_try = [m for m in all_models if m not in exhausted_models]
+    if not models_to_try:
+        print(f"  Chunk {chunk_index} tüm modeller tükendi, İngilizce bırakıldı.")
+        return blocks
     max_retries = 3
     for model in models_to_try:
         for attempt in range(max_retries):
@@ -87,6 +93,7 @@ def _translate_chunk(client, model_name: str, blocks: list[dict], chunk_index: i
                 print(f"  Chunk {chunk_index} hatası [{model}] (deneme {attempt+1}/{max_retries}): {e}")
                 if is_quota:
                     print(f"  Kota doldu, sonraki modele geçiliyor...")
+                    exhausted_models.add(model)
                     break
                 if attempt < max_retries - 1:
                     import re
@@ -109,10 +116,11 @@ def _translate(srt_en: str) -> str:
     model_name = config.get("gemini_model")
     blocks     = _parse_srt(srt_en)
     chunks     = [blocks[i:i + CHUNK_SIZE] for i in range(0, len(blocks), CHUNK_SIZE)]
-    tr_all     = []
+    tr_all           = []
+    exhausted_models = set()
     for ci, chunk in enumerate(chunks, 1):
         print(f"  Çeviri: {ci}/{len(chunks)}")
-        tr_all.extend(_translate_chunk(client, model_name, chunk, ci))
+        tr_all.extend(_translate_chunk(client, model_name, chunk, ci, exhausted_models))
     return _blocks_to_srt(tr_all)
 
 
@@ -220,6 +228,7 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
     chunk_num  = 0    # çeviri chunk sayacı
     ready_sent = False
 
+    exhausted_models = set()
     for seg in segments:
         seg_count += 1
         pending.append({
@@ -232,7 +241,7 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
         if len(pending) >= STREAM_CHUNK:
             chunk_num += 1
             print(f"  Çeviri: chunk {chunk_num} ({seg_count} segment işlendi)")
-            translated = _translate_chunk(client, model_name, pending, chunk_num)
+            translated = _translate_chunk(client, model_name, pending, chunk_num, exhausted_models)
             translated = _renumber(translated, blk_count + 1)
             _append_srt(srt_path, translated)
             blk_count += len(translated)
@@ -247,7 +256,7 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
     if pending:
         chunk_num += 1
         print(f"  Çeviri: chunk {chunk_num} (son)")
-        translated = _translate_chunk(client, model_name, pending, chunk_num)
+        translated = _translate_chunk(client, model_name, pending, chunk_num, exhausted_models)
         translated = _renumber(translated, blk_count + 1)
         _append_srt(srt_path, translated)
 
