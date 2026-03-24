@@ -127,7 +127,7 @@ def cmd_run(source: str, no_play: bool):
             stderr=subprocess.DEVNULL,
             start_new_session=True
         )
-        print(f"▶ {player} açıldı")
+        print(f"▶ {player} açılıyor")
     except FileNotFoundError:
         print(f"mpv bulunamadı. SRT: {srt}")
 
