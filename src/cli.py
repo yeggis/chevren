@@ -112,24 +112,30 @@ def cmd_cache(args):
 
 def cmd_run(source: str, no_play: bool):
     workdir = Path(tempfile.mkdtemp(prefix="chevren_"))
-    srt     = pipeline.run(source, workdir)
+    player  = config.get("player") or "mpv"
+    mpv_started = False
+
+    def on_ready(srt_path: Path):
+        nonlocal mpv_started
+        if no_play or mpv_started:
+            return
+        try:
+            subprocess.Popen(
+                [player, source, f"--sub-file={srt_path}", "--sub-visibility=yes"],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+            print(f"▶ {player} açılıyor")
+            mpv_started = True
+        except FileNotFoundError:
+            print(f"mpv bulunamadı. SRT: {srt_path}")
+
+    srt = pipeline.run_streaming(source, workdir, on_ready=on_ready)
 
     if no_play:
         print(f"SRT: {srt}")
-        return
-
-    player = config.get("player") or "mpv"
-    try:
-        subprocess.Popen(
-            [player, source, f"--sub-file={srt}", "--sub-visibility=yes"],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True
-        )
-        print(f"▶ {player} açılıyor")
-    except FileNotFoundError:
-        print(f"mpv bulunamadı. SRT: {srt}")
 
 def main():
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
