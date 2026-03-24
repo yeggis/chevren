@@ -67,9 +67,11 @@ def _translate_chunk(client, model_name: str, blocks: list[dict], chunk_index: i
     if exhausted_models is None:
         exhausted_models = set()
     prompt = (
-        "Translate English SRT to Turkish. "
-        "Keep timestamps and numbers exactly. "
-        "Output ONLY the translated SRT.\n\n"
+        "Translate the following SRT subtitles to Turkish. "
+        "CRITICAL: Copy every timestamp line (format HH:MM:SS,mmm --> HH:MM:SS,mmm) EXACTLY as-is. "
+        "CRITICAL: Copy every number line (1, 2, 3...) EXACTLY as-is. "
+        "Translate ONLY the text lines. "
+        "Output ONLY the SRT content, no explanations.\n\n"
         + _blocks_to_srt(blocks)
     )
     all_models = [model_name] + [m for m in GEMINI_FALLBACK_MODELS if m != model_name]
