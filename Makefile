@@ -9,5 +9,5 @@ aur-update:
 	cp PKGBUILD .SRCINFO ../chevren-aur/
 	cd ../chevren-aur && \
 		git add PKGBUILD .SRCINFO && \
-		git commit -m "chore: update AUR package to v$(VERSION)-$(PKGREL)" && \
+		git commit -m "chore: update AUR package to v$(VERSION)-$(PKGREL)" || true && \
 		git push
