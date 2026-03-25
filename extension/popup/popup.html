@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      width: 220px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+      padding: 12px;
+      margin: 0;
+      color: #1a1a1a;
+    }
+    h2 { margin: 0 0 10px; font-size: 15px; color: #534AB7; }
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #ccc;
+      flex-shrink: 0;
+    }
+    .dot.ok { background: #1D9E75; }
+    .dot.err { background: #E24B4A; }
+    #status-text { color: #555; }
+  </style>
+</head>
+<body>
+  <h2>Chevren</h2>
+  <div class="status-row">
+    <div class="dot" id="dot"></div>
+    <span id="status-text">kontrol ediliyor...</span>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

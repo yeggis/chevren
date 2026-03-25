@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Chevren",
+  "version": "0.1.0",
+  "description": "YouTube videolarını Türkçe altyazıyla izle",
+
+  "permissions": [
+    "activeTab"
+  ],
+
+  "host_permissions": [
+    "http://localhost:7373/*",
+    "https://www.youtube.com/*"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "48": "icons/icon48.png"
+    }
+  },
+
+  "icons": {
+    "48": "icons/icon48.png"
+  }
+}
