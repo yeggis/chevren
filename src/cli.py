@@ -1,6 +1,7 @@
 """
 cli.py — chevren komut satırı arayüzü
 """
+
 import argparse
 import locale
 import os
@@ -16,9 +17,11 @@ import cache
 import config
 import pipeline
 
+
 def _is_turkish() -> bool:
     lang = os.environ.get("LANG", "") or locale.getlocale()[0] or ""
     return lang.lower().startswith("tr")
+
 
 def _help_text() -> str:
     if _is_turkish():
@@ -67,19 +70,21 @@ OPTIONS:
   --version  Version info
 """
 
+
 def cmd_setup():
     print("Chevren kurulum sihirbazı\n")
     cfg = config.load()
 
     import getpass
-    existing = "●●●●●●●●" if cfg.get('gemini_api_key') else 'boş'
+
+    existing = "●●●●●●●●" if cfg.get("gemini_api_key") else "boş"
     key = getpass.getpass(f"Gemini API key [{existing}]: ").strip()
     if key:
         cfg["gemini_api_key"] = key
 
     detected = config.detect_hardware()["whisper_model"]
-    current  = cfg.get('whisper_model', detected)
-    model    = input(f"Whisper modeli [{detected} önerilen, şu an: {current}]: ").strip()
+    current = cfg.get("whisper_model", detected)
+    model = input(f"Whisper modeli [{detected} önerilen, şu an: {current}]: ").strip()
     cfg["whisper_model"] = model if model else detected
     player = input(f"Oynatıcı [{cfg.get('player', 'mpv')}]: ").strip()
     if player:
@@ -88,6 +93,32 @@ def cmd_setup():
     config.save(cfg)
     print("\nAyarlar kaydedildi.")
     print(f"Donanım: {config.hardware_summary()}")
+    _enable_server_service()
+
+
+def _enable_server_service():
+    import shutil
+
+    if not shutil.which("systemctl"):
+        return
+    service = Path.home() / ".config/systemd/user/chevren-server.service"
+    service.parent.mkdir(parents=True, exist_ok=True)
+    system_service = Path("/usr/lib/systemd/user/chevren-server.service")
+    if system_service.exists() and not service.exists():
+        import shutil as sh
+
+        sh.copy(system_service, service)
+    result = subprocess.run(
+        ["systemctl", "--user", "enable", "--now", "chevren-server"],
+        capture_output=True,
+    )
+    if result.returncode == 0:
+        print("chevren-server servisi aktif edildi.")
+    else:
+        print(
+            "Servis aktif edilemedi, manuel olarak çalıştırın: systemctl --user enable --now chevren-server"
+        )
+
 
 def cmd_config(args):
     if len(args) < 2:
@@ -95,6 +126,7 @@ def cmd_config(args):
         sys.exit(1)
     config.set_key(args[0], args[1])
     print(f"{args[0]} = {args[1]}")
+
 
 def cmd_cache(args):
     if not args or args[0] == "list":
@@ -110,9 +142,10 @@ def cmd_cache(args):
     else:
         print(f"Bilinmeyen alt komut: {args[0]}")
 
+
 def cmd_run(source: str, no_play: bool):
     workdir = Path(tempfile.mkdtemp(prefix="chevren_"))
-    player  = config.get("player") or "mpv"
+    player = config.get("player") or "mpv"
     mpv_started = False
 
     def on_ready(srt_path: Path):
@@ -121,12 +154,17 @@ def cmd_run(source: str, no_play: bool):
             return
         try:
             subprocess.Popen(
-                [player, source, f"--sub-file={srt_path}", "--sub-visibility=yes",
-                 "--input-ipc-server=/tmp/chevren-mpv-socket"],
+                [
+                    player,
+                    source,
+                    f"--sub-file={srt_path}",
+                    "--sub-visibility=yes",
+                    "--input-ipc-server=/tmp/chevren-mpv-socket",
+                ],
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                start_new_session=True
+                start_new_session=True,
             )
             print(f"▶ {player} açılıyor")
             mpv_started = True
@@ -137,6 +175,7 @@ def cmd_run(source: str, no_play: bool):
 
     if no_play:
         print(f"SRT: {srt}")
+
 
 def main():
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
@@ -160,13 +199,14 @@ def main():
         return
 
     no_play = "--no-play" in sys.argv
-    source  = next((a for a in sys.argv[1:] if not a.startswith("-")), None)
+    source = next((a for a in sys.argv[1:] if not a.startswith("-")), None)
 
     if not source:
         print(_help_text())
         return
 
     cmd_run(source, no_play)
+
 
 if __name__ == "__main__":
     main()
