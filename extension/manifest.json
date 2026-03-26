@@ -4,6 +4,17 @@
   "version": "0.1.0",
   "description": "YouTube videolarını Türkçe altyazıyla izle",
 
+  "browser_specific_settings": {
+  "gecko": {
+    "id": "chevren@yeggis",
+    "strict_min_version": "140.0",
+    "data_collection_permissions": {
+      "required": ["none"],
+      "optional": []
+    }
+  }
+},
+
   "permissions": [
     "activeTab"
   ],
