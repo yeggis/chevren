@@ -1,0 +1,11 @@
+[Unit]
+Description=Chevren HTTP server
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/chevren-server
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

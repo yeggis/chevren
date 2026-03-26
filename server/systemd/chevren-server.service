@@ -1,0 +1,11 @@
+[Unit]
+Description=Chevren HTTP server
+After=network.target
+
+[Service]
+ExecStart=/home/yeggiss/Genel/projects/chevren/server/target/release/chevren-server
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
