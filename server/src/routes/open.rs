@@ -64,7 +64,7 @@ async fn run_pipeline(url: &str, srt_path: &PathBuf) -> anyhow::Result<()> {
     }
 
     let status = Command::new("chevren")
-        .args(["--no-mpv", url, "--output", srt_path.to_str().unwrap_or("/tmp/out.srt")])
+    .args(["--no-play", url])
         .status()
         .await?;
 
@@ -82,4 +82,35 @@ fn error_response(msg: &str) -> (StatusCode, Json<OpenResponse>) {
             message: msg.into(),
         }),
     )
+}
+
+#[derive(Deserialize)]
+pub struct GenerateRequest {
+    pub url: String,
+}
+
+pub async fn generate_handler(
+    Json(req): Json<GenerateRequest>,
+) -> Result<Json<OpenResponse>, (StatusCode, Json<OpenResponse>)> {
+    let video_id = extract_video_id(&req.url).ok_or_else(|| {
+        error_response("Geçersiz YouTube URL'si")
+    })?;
+
+    let srt_path = cache_path(&video_id);
+
+    if srt_path.exists() {
+        return Ok(Json(OpenResponse {
+            status: "ok".into(),
+            message: "cache'den hazır".into(),
+        }));
+    }
+
+    run_pipeline(&req.url, &srt_path).await.map_err(|e| {
+        error_response(&format!("Pipeline hatası: {e}"))
+    })?;
+
+    Ok(Json(OpenResponse {
+        status: "ok".into(),
+        message: "altyazı üretildi".into(),
+    }))
 }

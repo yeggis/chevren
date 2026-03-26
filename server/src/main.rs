@@ -17,6 +17,7 @@ async fn main() {
     let app = Router::new()
         .route("/status",          get(routes::status::handler))
         .route("/open",            post(routes::open::handler))
+        .route("/generate", post(routes::open::generate_handler))
         .route("/subtitle/:id",    get(routes::subtitle::handler))
         .route("/mpv/command",     post(routes::mpv_cmd::handler))
         .layer(cors);

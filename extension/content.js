@@ -91,27 +91,48 @@ async function toggleOverlay() {
     return;
   }
 
-  try {
-    const res = await fetch(`${SERVER}/subtitle/${id}`);
-    if (!res.ok) {
-      setStatus("altyazı bulunamadı");
+  setStatus("kontrol ediliyor...");
+
+  let res = await fetch(`${SERVER}/subtitle/${id}`).catch(() => null);
+
+  if (!res || !res.ok) {
+    setStatus("altyazı üretiliyor...");
+    try {
+      await fetch(`${SERVER}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: window.location.href }),
+      });
+      res = await fetch(`${SERVER}/subtitle/${id}`).catch(() => null);
+    } catch {
+      setStatus("server'a ulaşılamadı");
       return;
     }
-    const srt = await res.text();
-    const cues = parseSrt(srt);
-
-    overlayActive = true;
-    document.getElementById("chevren-btn-overlay").style.background = "#2d2b55";
-    mountOverlay(cues);
-  } catch {
-    setStatus("server'a ulaşılamadı");
   }
+
+  if (!res || !res.ok) {
+    setStatus("altyazı bulunamadı");
+    return;
+  }
+
+  const srt = await res.text();
+  const cues = parseSrt(srt);
+  overlayActive = true;
+  setStatus("");
+  document.getElementById("chevren-btn-overlay").style.background = "#2d2b55";
+  mountOverlay(cues);
+}
+
+function getOverlayFontSize() {
+  const video = document.querySelector("video");
+  if (!video) return 16;
+  const height = video.getBoundingClientRect().height;
+  return Math.max(14, Math.round(height * 0.045));
 }
 
 function mountOverlay(cues) {
-  const player = document.querySelector("#movie_player") ||
-                 document.querySelector("video");
-  if (!player) return;
+  const video = document.querySelector("video");
+  if (!video) return;
 
   overlayEl = document.createElement("div");
   overlayEl.id = "chevren-overlay";
@@ -129,19 +150,33 @@ function mountOverlay(cues) {
   text.style.cssText = `
     background: rgba(0,0,0,0.75);
     color: #fff;
-    font-size: 16px;
     padding: 5px 16px;
     border-radius: 4px;
     display: inline-block;
+    font-size: ${getOverlayFontSize()}px;
   `;
   overlayEl.appendChild(text);
 
-  const playerContainer = player.closest(".html5-video-container") || player.parentElement;
+  const playerContainer = document.querySelector("#movie_player") ||
+                         video.closest("ytd-player") ||
+                         video.closest("[id='movie_player']");
+
+if (playerContainer) {
   playerContainer.style.position = "relative";
   playerContainer.appendChild(overlayEl);
+} else {
+  document.body.appendChild(overlayEl);
+  overlayEl.style.position = "fixed";
+  overlayEl.style.bottom = "80px";
+  overlayEl.style.left = "0";
+  overlayEl.style.right = "0";
+  overlayEl.style.zIndex = "99999";
+}
 
-  const video = document.querySelector("video");
-  if (!video) return;
+  const resizeObserver = new ResizeObserver(() => {
+    text.style.fontSize = getOverlayFontSize() + "px";
+  });
+  resizeObserver.observe(video);
 
   video.addEventListener("timeupdate", () => {
     if (!overlayActive) return;

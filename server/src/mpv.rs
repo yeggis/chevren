@@ -11,6 +11,9 @@ pub async fn open_with_subtitle(url: &str, srt_path: &PathBuf) -> anyhow::Result
             "--input-ipc-server=/tmp/chevren-mpv.sock",
             &format!("--sub-file={}", srt_path.display()),
         ])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .spawn()?;
     Ok(())
 }
