@@ -4,7 +4,11 @@
       "updates": [
         {
           "version": "0.1.0",
-          "update_link": "https://github.com/yeggis/chevren/releases/download/v0.1.0-ext/chevren.xpi"
+          "update_link": "https://github.com/yeggis/chevren/releases/download/ext-v0.1.0/chevren.xpi"
+        },
+        {
+          "version": "0.1.1",
+          "update_link": "https://github.com/yeggis/chevren/releases/download/ext-v0.1.1/chevren.xpi"
         }
       ]
     }
