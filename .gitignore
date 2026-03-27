@@ -6,3 +6,4 @@ models/
 .envrc
 server/target/
 *.zip
+*.pkg.tar.zst
