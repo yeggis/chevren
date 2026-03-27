@@ -7,18 +7,76 @@ function getVideoId() {
 
 // ── Buton enjeksiyonu ────────────────────────────────────────────────────────
 
+function injectStyles() {
+  if (document.getElementById("chevren-styles")) return;
+  const style = document.createElement("style");
+  style.id = "chevren-styles";
+  style.textContent = `
+    #chevren-btn-mpv,
+    #chevren-btn-overlay,
+    #chevren-btn-regen {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      position: relative;
+    }
+    #chevren-tooltip {
+      position: fixed;
+      background: rgba(28,28,28,0.95);
+      color: #fff;
+      font-size: 12px;
+      font-family: sans-serif;
+      padding: 4px 8px;
+      border-radius: 4px;
+      pointer-events: none;
+      z-index: 999999;
+      white-space: nowrap;
+      transform: translateX(-50%);
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function initTooltip() {
+  if (document.getElementById("chevren-tooltip")) return;
+  const tip = document.createElement("div");
+  tip.id = "chevren-tooltip";
+  tip.style.display = "none";
+  document.body.appendChild(tip);
+}
+
+function bindTooltip(el, text) {
+  el.setAttribute("data-chevren-tip", text);
+  el.addEventListener("mouseenter", (e) => {
+    const tip = document.getElementById("chevren-tooltip");
+    if (!tip) return;
+    tip.textContent = el.getAttribute("data-chevren-tip");
+    tip.style.display = "block";
+    const rect = el.getBoundingClientRect();
+    tip.style.left = (rect.left + rect.width / 2) + "px";
+    tip.style.top = (rect.top - 32) + "px";
+  });
+  el.addEventListener("mouseleave", () => {
+    const tip = document.getElementById("chevren-tooltip");
+    if (tip) tip.style.display = "none";
+  });
+}
+
 function injectButtons() {
   if (document.getElementById("chevren-btn-mpv")) return;
 
   const controls = document.querySelector(".ytp-right-controls");
   if (!controls) return;
 
+  injectStyles();
+  initTooltip();
+
   // mpv butonu
   const btnMpv = document.createElement("button");
   btnMpv.id = "chevren-btn-mpv";
   btnMpv.className = "ytp-button";
-  btnMpv.title = "mpv'de aç";
-  btnMpv.innerHTML = `<svg height="100%" viewBox="0 0 36 36" width="100%">
+  bindTooltip(btnMpv, "mpv'de aç");
+  btnMpv.innerHTML = `<svg viewBox="0 0 36 36" width="22" height="22">
     <path fill="white" d="M8 11v14l12-7L8 11zm14 0v6l5-3-5-3zm0 8v6l5-3-5-3z"/>
   </svg>`;
   btnMpv.addEventListener("click", openInMpv);
@@ -27,8 +85,8 @@ function injectButtons() {
   const btnOverlay = document.createElement("button");
   btnOverlay.id = "chevren-btn-overlay";
   btnOverlay.className = "ytp-button";
-  btnOverlay.title = "Türkçe altyazı";
-  btnOverlay.innerHTML = `<svg height="100%" viewBox="0 0 36 36" width="100%">
+  bindTooltip(btnOverlay, "Türkçe altyazı");
+  btnOverlay.innerHTML = `<svg viewBox="0 0 36 36" width="22" height="22">
     <path fill="white" d="M5 8h26v16H5V8zm3 4v2h16v-2H8zm0 4v2h10v-2H8z" opacity="0.9"/>
   </svg>`;
   btnOverlay.addEventListener("click", toggleOverlay);
@@ -37,16 +95,17 @@ function injectButtons() {
   const btnRegen = document.createElement("button");
   btnRegen.id = "chevren-btn-regen";
   btnRegen.className = "ytp-button";
-  btnRegen.title = "Altyazıyı yeniden oluştur";
-  btnRegen.innerHTML = `<svg height="100%" viewBox="0 0 36 36" width="100%">
+  bindTooltip(btnRegen, "Altyazıyı yeniden oluştur");
+  btnRegen.innerHTML = `<svg viewBox="0 0 36 36" width="22" height="22">
     <path fill="white" d="M18 8a10 10 0 0 0-9.95 11H5l4 4 4-4H9.1A8 8 0 1 1 18 26v2a10 10 0 0 0 0-20z"/>
   </svg>`;
   btnRegen.addEventListener("click", regenerateSubtitle);
 
-  // Sola ekle (YouTube'un buton sırasının başına)
-  controls.prepend(btnRegen);
-  controls.prepend(btnOverlay);
-  controls.prepend(btnMpv);
+  // Sol başa ekle: mpv → altyazı → yeniden oluştur
+  const firstChild = controls.firstChild;
+  controls.insertBefore(btnRegen, firstChild);
+  controls.insertBefore(btnOverlay, btnRegen);
+  controls.insertBefore(btnMpv, btnOverlay);
 }
 
 // ── mpv modu ─────────────────────────────────────────────────────────────────
@@ -255,28 +314,45 @@ function srtTimeToSeconds(t) {
 
 function setTooltip(id, msg) {
   const el = document.getElementById(id);
-  if (el) el.title = msg;
+  if (el) el.setAttribute("data-chevren-tip", msg);
+}
+
+// ── Injection — .ytp-right-controls hazır olunca inject et ───────────────────
+
+let controlsObserver = null;
+
+function waitForControls() {
+  // Zaten inject edilmişse dur
+  if (document.getElementById("chevren-btn-mpv")) return;
+
+  // Element hazırsa hemen inject et
+  if (document.querySelector(".ytp-right-controls")) {
+    injectButtons();
+    return;
+  }
+
+  // DOM değişikliklerini izle, .ytp-right-controls çıkınca inject et
+  if (controlsObserver) controlsObserver.disconnect();
+  controlsObserver = new MutationObserver(() => {
+    if (document.querySelector(".ytp-right-controls")) {
+      controlsObserver.disconnect();
+      injectButtons();
+    }
+  });
+  controlsObserver.observe(document.body, { childList: true, subtree: true });
 }
 
 // ── URL takibi ────────────────────────────────────────────────────────────────
-
-function onUrlChange() {
-  if (getVideoId()) {
-    setTimeout(injectButtons, 1500);
-  }
-}
-
-const observer = new MutationObserver(onUrlChange);
-observer.observe(document.body, { childList: true, subtree: true });
 
 let lastUrl = location.href;
 setInterval(() => {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
-    onUrlChange();
+    // Butonları temizle (yeni video)
+    ["chevren-btn-mpv", "chevren-btn-overlay", "chevren-btn-regen"]
+      .forEach(id => document.getElementById(id)?.remove());
+    if (getVideoId()) waitForControls();
   }
-}, 1000);
+}, 500);
 
-if (getVideoId()) {
-  setTimeout(injectButtons, 1500);
-}
+if (getVideoId()) waitForControls();
