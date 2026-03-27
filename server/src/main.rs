@@ -1,7 +1,7 @@
 mod mpv;
 mod routes;
 
-use axum::{Router, routing::{get, post}};
+use axum::{Router, routing::{delete, get, post}};
 use tower_http::cors::{CorsLayer, Any};
 use tracing_subscriber::fmt;
 
@@ -18,7 +18,8 @@ async fn main() {
         .route("/status",          get(routes::status::handler))
         .route("/open",            post(routes::open::handler))
         .route("/generate", post(routes::open::generate_handler))
-        .route("/subtitle/:id",    get(routes::subtitle::handler))
+        .route("/subtitle/:id",    get(routes::subtitle::handler)
+                                  .delete(routes::subtitle::delete_handler))
         .route("/mpv/command",     post(routes::mpv_cmd::handler))
         .layer(cors);
 

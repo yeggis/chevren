@@ -64,9 +64,15 @@ GEMINI_FALLBACK_MODELS = [
 ]
 
 def _translate_chunk(client, model_name: str, blocks: list[dict], chunk_index: int, exhausted_models: set = None) -> list[dict]:
-    """Bir segment grubunu Türkçe'ye çevirir, hata durumunda retry yapar."""
+    """Bir segment grubunu Türkçe'ye çevirir.
+
+    Kota dolduğunda: o modeli exhausted_models'e ekle, AYNI CHUNK'I sonraki
+    modelle hemen dene. Başka bir hata olduğunda: max_retries kadar bekleyerek
+    tekrar dene. Tüm modeller tükenirse zaten chunk'ı İngilizce bırak.
+    """
     if exhausted_models is None:
         exhausted_models = set()
+
     prompt = (
         "Translate the following SRT subtitles to Turkish. "
         "CRITICAL: Copy every timestamp line (format HH:MM:SS,mmm --> HH:MM:SS,mmm) EXACTLY as-is. "
@@ -75,38 +81,44 @@ def _translate_chunk(client, model_name: str, blocks: list[dict], chunk_index: i
         "Output ONLY the SRT content, no explanations.\n\n"
         + _blocks_to_srt(blocks)
     )
+
     all_models = [model_name] + [m for m in GEMINI_FALLBACK_MODELS if m != model_name]
-    models_to_try = [m for m in all_models if m not in exhausted_models]
-    if not models_to_try:
-        print(f"  Chunk {chunk_index} tüm modeller tükendi, İngilizce bırakıldı.")
-        return blocks
-    max_retries = 3
-    for model in models_to_try:
-        for attempt in range(max_retries):
+
+    for model in all_models:
+        if model in exhausted_models:
+            continue  # bu model daha önce kota doldu, atla
+
+        print(f"  Chunk {chunk_index}: [{model}] deneniyor...")
+        success = False
+        for attempt in range(3):
             try:
                 tr_text = client.models.generate_content(model=model, contents=prompt).text.strip()
                 tr_text = tr_text.replace("```srt", "").replace("```", "").strip()
                 tr_chunk = _parse_srt(tr_text)
+                # Eksik blok varsa İngilizcesiyle doldur
                 while len(tr_chunk) < len(blocks):
                     tr_chunk.append(blocks[len(tr_chunk)])
+                success = True
                 return tr_chunk
             except Exception as e:
                 err = str(e)
                 is_quota = "429" in err or "RESOURCE_EXHAUSTED" in err
-                print(f"  Chunk {chunk_index} hatası [{model}] (deneme {attempt+1}/{max_retries}): {e}")
                 if is_quota:
-                    print(f"  Kota doldu, sonraki modele geçiliyor...")
+                    print(f"  Chunk {chunk_index}: [{model}] kota doldu → sonraki model deneniyor")
                     exhausted_models.add(model)
-                    break
-                if attempt < max_retries - 1:
+                    break  # bu modeli bırak, for model döngüsünün sonraki modeline geç
+                print(f"  Chunk {chunk_index}: [{model}] hata (deneme {attempt+1}/3): {e}")
+                if attempt < 2:
                     import re
                     match = re.search(r'retryDelay.*?(\d+)s', err)
                     wait = int(match.group(1)) + 2 if match else 5 * (attempt + 1)
                     print(f"  {wait} saniye bekleniyor...")
                     time.sleep(wait)
-                else:
-                    break
-    print(f"  Chunk {chunk_index} tüm modeller denendi, İngilizce bırakıldı.")
+
+        if success:
+            break  # başarıyla döndü (aslında return ile zaten çıkmış olur)
+
+    print(f"  Chunk {chunk_index}: tüm modeller tükendi, İngilizce bırakıldı.")
     return blocks
 
 def _translate(srt_en: str) -> str:
