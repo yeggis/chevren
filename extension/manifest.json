@@ -8,6 +8,7 @@
   "gecko": {
     "id": "chevren@yeggis",
     "strict_min_version": "140.0",
+    "update_url": "https://yeggis.github.io/chevren/updates.json",
     "data_collection_permissions": {
       "required": ["none"],
       "optional": []
