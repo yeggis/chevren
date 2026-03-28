@@ -1,14 +1,11 @@
 [![Chevren CI](https://github.com/yeggis/chevren/actions/workflows/ci.yml/badge.svg)](https://github.com/yeggis/chevren/actions/workflows/ci.yml)
-
 <div align="center">
-
 <img src="https://raw.githubusercontent.com/yeggis/chevren/main/docs/logo.png" alt="Chevren" width="120" />
 
 # Chevren
 
 **🌐 Language / Dil:**
 [🇹🇷 Türkçe](#-türkçe) · [🇬🇧 English](#-english)
-
 </div>
 
 ---
@@ -63,23 +60,34 @@ YouTube / Yerel Dosya
 
 #### 🚀 Evrensel Kurulum Scripti (Önerilen)
 
-Arch/CachyOS · Debian/Ubuntu · Fedora · openSUSE desteklenir:
+Linux (Arch/CachyOS · Debian/Ubuntu · Fedora · openSUSE) ve **Windows** desteklenir:
 
 ```bash
 git clone https://github.com/yeggis/chevren.git
 cd chevren
-chmod +x install.sh
-./install.sh
+python install.py
 ```
 
-> Script, dağıtımınızı otomatik algılar ve uygun paket yöneticisini kullanır.
+> Script, işletim sisteminizi ve dağıtımınızı otomatik algılar, uygun paket yöneticisini kullanır.
+
+```bash
+# Sadece ne yapılacağını görmek için:
+python install.py --dry-run
+
+# Sistem paketlerini atla, sadece Python bağımlılıklarını kur:
+python install.py --skip-deps
+
+# Yardım:
+python install.py --help
+```
+
+> **Linux notu:** `install.sh` hâlâ geçerlidir ve Arch/Debian/Fedora/openSUSE üzerinde çalışır.
 
 #### Arch Linux / CachyOS / Manjaro — AUR
 
 ```bash
 # paru ile
 paru -S chevren
-
 # ya da yay ile
 yay -S chevren
 ```
@@ -87,36 +95,41 @@ yay -S chevren
 #### Debian / Ubuntu
 
 ```bash
-sudo apt update
-sudo apt install python3 ffmpeg mpv yt-dlp
+sudo apt update && sudo apt install python3 ffmpeg mpv yt-dlp
 git clone https://github.com/yeggis/chevren.git
 cd chevren
-pip install -r requirements.txt --break-system-packages
-sudo make install
+python install.py
 ```
 
 #### Fedora
 
 ```bash
-# RPM Fusion Free otomatik etkinleştirilir (ffmpeg için)
-sudo dnf install python3 ffmpeg mpv yt-dlp
 git clone https://github.com/yeggis/chevren.git
 cd chevren
-pip install -r requirements.txt --break-system-packages
-sudo make install
+python install.py
 ```
+
+> RPM Fusion Free deposu ffmpeg için otomatik etkinleştirilir.
 
 #### openSUSE
 
 ```bash
-sudo zypper install python3 ffmpeg mpv yt-dlp
 git clone https://github.com/yeggis/chevren.git
 cd chevren
-pip install -r requirements.txt --break-system-packages
-sudo make install
+python install.py
 ```
 
 > **openSUSE notu:** Packman deposu ffmpeg için gerekebilir. Script kurulumu durdurmaz, uyarı verir.
+
+#### Windows
+
+```bash
+git clone https://github.com/yeggis/chevren.git
+cd chevren
+python install.py
+```
+
+> `ffmpeg`, `mpv` ve `yt-dlp` otomatik olarak `winget` aracılığıyla kurulur. `winget` yoksa manuel kurulum bağlantıları gösterilir.
 
 #### Manuel Kurulum
 
@@ -141,11 +154,9 @@ make install
 İlk çalıştırmadan önce Gemini API anahtarınızı ayarlayın:
 
 ```bash
-# ~/.config/chevren/config dosyası oluşturulur (ilk çalıştırmada)
-chevren --setup
-
-# Ya da ortam değişkeni olarak:
-export GEMINI_API_KEY="sizin-api-anahtariniz"
+chevren setup
+# Ya da doğrudan:
+chevren config gemini_api_key ANAHTARINIZ
 ```
 
 > **Not:** Gemini API anahtarını [Google AI Studio](https://aistudio.google.com/app/apikey)'dan ücretsiz alabilirsiniz.
@@ -168,7 +179,6 @@ chevren --help
 YouTube sayfasında "Chevren ile Çevir" butonu ekleyerek tek tıkla kullanım sağlar.
 
 **Kurulum (v0.1.1):**
-
 1. [Releases sayfasından](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.1) `chevren.xpi` dosyasını indirin
 2. Firefox'ta `about:addons` sayfasını açın
 3. Dişli ikonu → "Eklentiyi Dosyadan Yükle" → `chevren.xpi`
@@ -176,7 +186,7 @@ YouTube sayfasında "Chevren ile Çevir" butonu ekleyerek tek tıkla kullanım s
 
 ### 🖥️ Sistem Gereksinimleri
 
-- **OS:** Arch Linux / CachyOS / Manjaro · Debian / Ubuntu · Fedora · openSUSE
+- **OS:** Arch Linux / CachyOS / Manjaro · Debian / Ubuntu · Fedora · openSUSE · **Windows 10/11**
 - **GPU:** NVIDIA (CUDA destekli) — CPU modu da çalışır, yavaştır
 - **Python:** 3.10+
 - **Wayland / X11:** Her ikisi de desteklenir
@@ -257,23 +267,34 @@ YouTube / Local File
 
 #### 🚀 Universal Install Script (Recommended)
 
-Supports Arch/CachyOS · Debian/Ubuntu · Fedora · openSUSE:
+Supports Linux (Arch/CachyOS · Debian/Ubuntu · Fedora · openSUSE) and **Windows**:
 
 ```bash
 git clone https://github.com/yeggis/chevren.git
 cd chevren
-chmod +x install.sh
-./install.sh
+python install.py
 ```
 
-> The script auto-detects your distribution and uses the appropriate package manager.
+> The script auto-detects your OS and distribution, then uses the appropriate package manager.
+
+```bash
+# Preview what will be installed without making changes:
+python install.py --dry-run
+
+# Skip system packages, install Python dependencies only:
+python install.py --skip-deps
+
+# Help:
+python install.py --help
+```
+
+> **Linux note:** `install.sh` remains available and works on Arch/Debian/Fedora/openSUSE.
 
 #### Arch Linux / CachyOS / Manjaro — AUR
 
 ```bash
 # using paru
 paru -S chevren
-
 # or using yay
 yay -S chevren
 ```
@@ -281,36 +302,41 @@ yay -S chevren
 #### Debian / Ubuntu
 
 ```bash
-sudo apt update
-sudo apt install python3 ffmpeg mpv yt-dlp
+sudo apt update && sudo apt install python3 ffmpeg mpv yt-dlp
 git clone https://github.com/yeggis/chevren.git
 cd chevren
-pip install -r requirements.txt --break-system-packages
-sudo make install
+python install.py
 ```
 
 #### Fedora
 
 ```bash
-# RPM Fusion Free is enabled automatically (required for ffmpeg)
-sudo dnf install python3 ffmpeg mpv yt-dlp
 git clone https://github.com/yeggis/chevren.git
 cd chevren
-pip install -r requirements.txt --break-system-packages
-sudo make install
+python install.py
 ```
+
+> RPM Fusion Free is enabled automatically for ffmpeg.
 
 #### openSUSE
 
 ```bash
-sudo zypper install python3 ffmpeg mpv yt-dlp
 git clone https://github.com/yeggis/chevren.git
 cd chevren
-pip install -r requirements.txt --break-system-packages
-sudo make install
+python install.py
 ```
 
 > **openSUSE note:** The Packman repository may be required for ffmpeg. The install script will warn but not abort.
+
+#### Windows
+
+```bash
+git clone https://github.com/yeggis/chevren.git
+cd chevren
+python install.py
+```
+
+> `ffmpeg`, `mpv`, and `yt-dlp` are installed automatically via `winget`. If winget is unavailable, manual download links are displayed.
 
 #### Manual Installation
 
@@ -335,11 +361,9 @@ make install
 Set up your Gemini API key before first use:
 
 ```bash
-# A config file will be created at ~/.config/chevren/config
-chevren --setup
-
-# Or set as an environment variable:
-export GEMINI_API_KEY="your-api-key-here"
+chevren setup
+# Or directly:
+chevren config gemini_api_key YOUR_KEY
 ```
 
 > **Note:** Get a free Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey).
@@ -362,7 +386,6 @@ chevren --help
 Adds a "Translate with Chevren" button on YouTube pages for one-click subtitle generation.
 
 **Installation (v0.1.1):**
-
 1. Download `chevren.xpi` from the [Releases page](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.1)
 2. Open `about:addons` in Firefox
 3. Gear icon → "Install Add-on From File" → select `chevren.xpi`
@@ -370,7 +393,7 @@ Adds a "Translate with Chevren" button on YouTube pages for one-click subtitle g
 
 ### 🖥️ System Requirements
 
-- **OS:** Arch Linux / CachyOS / Manjaro · Debian / Ubuntu · Fedora · openSUSE
+- **OS:** Arch Linux / CachyOS / Manjaro · Debian / Ubuntu · Fedora · openSUSE · **Windows 10/11**
 - **GPU:** NVIDIA (CUDA-capable) — CPU mode works but is slower
 - **Python:** 3.10+
 - **Display:** Wayland or X11
