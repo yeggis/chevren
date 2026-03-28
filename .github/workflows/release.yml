@@ -1,24 +1,17 @@
-name: Release — Windows install.exe
+name: Release - Windows install.exe
 
-# Ne zaman tetiklenir?
-# "git push origin v1.0.14" gibi "v" ile başlayan bir tag push'landığında.
 on:
   push:
     tags:
       - "v*"
 
-# ── Ortam değişkeni ─────────────────────────────────────────
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # ══════════════════════════════════════════════════════════
-  # 1) Windows'ta install.exe üret
-  # ══════════════════════════════════════════════════════════
   build-windows-exe:
-    name: "🪟 Windows install.exe üret"
+    name: "Windows install.exe uret"
     runs-on: windows-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,180 +21,55 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: pip güncelle
+      - name: pip guncelle
         run: python -m pip install --upgrade pip
 
-      # PyInstaller: Python script'ini .exe'ye paketleyen araç.
-      # platformdirs: install.py'nin Windows'ta config klasörü bulmak için kullandığı paket.
-      - name: PyInstaller ve bağımlılıkları kur
-        run: |
-          python -m pip install pyinstaller platformdirs urllib3 charset-normalizer
+      - name: PyInstaller ve bagimliliklar
+        run: python -m pip install pyinstaller platformdirs urllib3 charset-normalizer
 
-      # --onefile    → her şeyi tek bir .exe dosyasına sıkıştır
-      # --console    → konsol penceresi açık kalsın (zaten default, ama açıkça belirtiyoruz)
-      # --name       → çıktı dosyasının adı: install.exe
-      - name: install.py → install.exe
-        run: |
-          pyinstaller --onefile --console --name install install.py
+      - name: install.py exe yap
+        run: pyinstaller --onefile --console --name install install.py
 
-      # PyInstaller çıktısı dist/ klasörüne gider: dist/install.exe
-      - name: Exe varlığını doğrula
-        run: |
-          dir dist\install.exe
+      - name: Exe dogrula
+        run: dir dist\install.exe
 
-      # Bu adım üretilen dosyayı "artifact" olarak saklar.
-      # Bir sonraki job (GitHub Release oluşturma) bu dosyayı buradan alır.
-      - name: install.exe'yi artifact olarak kaydet
+      - name: Artifact kaydet
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
           path: dist/install.exe
           retention-days: 1
 
-  # ══════════════════════════════════════════════════════════
-  # 2) GitHub Release oluştur ve exe'yi yükle
-  # ══════════════════════════════════════════════════════════
   create-release:
-    name: "🚀 GitHub Release oluştur"
+    name: "GitHub Release olustur"
     runs-on: ubuntu-latest
-    needs: build-windows-exe  # build bitmeden başlama
-
-    # Bu job'ın Release oluşturabilmesi için write izni lazım.
+    needs: build-windows-exe
     permissions:
       contents: write
-
     steps:
-      - name: Artifact'ı indir (exe'yi al)
+      - name: Artifact indir
         uses: actions/download-artifact@v4
         with:
           name: windows-installer
           path: dist/
 
-      # github.ref_name → push'lanan tag adı, örn: "v1.0.14"
-      - name: GitHub Release oluştur ve install.exe yükle
+      - name: Release olustur
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: "Chevren ${{ github.ref_name }}"
           body: |
-            ## 🪟 Windows Kurulum
+            ## Windows Kurulum
+            1. install.exe dosyasini indir
+            2. Cift tikla - kurulum baslar
+            3. Kurulum bittikten sonra Entere bas
 
-            1. `install.exe` dosyasını indir
-            2. Çift tıkla — kurulum başlar
-            3. Kurulum bittikten sonra Enter'a bas
+            Not: Windows Defender uyari verebilir.
+            "Daha fazla bilgi" -> "Yine de calistir" adimlarini takip et.
 
-            > **Not:** Windows Defender uyarı verebilir.
-            > "Daha fazla bilgi" → "Yine de çalıştır" adımlarını takip et.
-
-            ---
-
-            ## 🐧 Linux
-
-            Arch/CachyOS: AUR'dan `chevren` paketini kur
-            Diğer distrolarda: `bash install.sh`
+            ## Linux
+            Arch/CachyOS: AURdan chevren paketini kur
+            Diger distrolarda: bash install.sh
           draft: false
           prerelease: false
-          files: dist/insname: Release — Windows install.exe
-
-          # Ne zaman tetiklenir?
-          # "git push origin v1.0.14" gibi "v" ile başlayan bir tag push'landığında.
-          on:
-            push:
-              tags:
-                - "v*"
-
-          # ── Ortam değişkeni ─────────────────────────────────────────
-          env:
-            FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
-          jobs:
-            # ══════════════════════════════════════════════════════════
-            # 1) Windows'ta install.exe üret
-            # ══════════════════════════════════════════════════════════
-            build-windows-exe:
-              name: "🪟 Windows install.exe üret"
-              runs-on: windows-latest
-
-              steps:
-                - name: Checkout
-                  uses: actions/checkout@v4
-
-                - name: Python 3.12 kur
-                  uses: actions/setup-python@v5
-                  with:
-                    python-version: "3.12"
-
-                - name: pip güncelle
-                  run: python -m pip install --upgrade pip
-
-                # PyInstaller: Python script'ini .exe'ye paketleyen araç.
-                # platformdirs: install.py'nin Windows'ta config klasörü bulmak için kullandığı paket.
-                - name: PyInstaller ve bağımlılıkları kur
-                  run: |
-                    python -m pip install pyinstaller platformdirs urllib3 charset-normalizer
-
-                # --onefile    → her şeyi tek bir .exe dosyasına sıkıştır
-                # --console    → konsol penceresi açık kalsın (zaten default, ama açıkça belirtiyoruz)
-                # --name       → çıktı dosyasının adı: install.exe
-                - name: install.py → install.exe
-                  run: |
-                    pyinstaller --onefile --console --name install install.py
-
-                # PyInstaller çıktısı dist/ klasörüne gider: dist/install.exe
-                - name: Exe varlığını doğrula
-                  run: |
-                    dir dist\install.exe
-
-                # Bu adım üretilen dosyayı "artifact" olarak saklar.
-                # Bir sonraki job (GitHub Release oluşturma) bu dosyayı buradan alır.
-                - name: install.exe'yi artifact olarak kaydet
-                  uses: actions/upload-artifact@v4
-                  with:
-                    name: windows-installer
-                    path: dist/install.exe
-                    retention-days: 1
-
-            # ══════════════════════════════════════════════════════════
-            # 2) GitHub Release oluştur ve exe'yi yükle
-            # ══════════════════════════════════════════════════════════
-            create-release:
-              name: "🚀 GitHub Release oluştur"
-              runs-on: ubuntu-latest
-              needs: build-windows-exe  # build bitmeden başlama
-
-              # Bu job'ın Release oluşturabilmesi için write izni lazım.
-              permissions:
-                contents: write
-
-              steps:
-                - name: Artifact'ı indir (exe'yi al)
-                  uses: actions/download-artifact@v4
-                  with:
-                    name: windows-installer
-                    path: dist/
-
-                # github.ref_name → push'lanan tag adı, örn: "v1.0.14"
-                - name: GitHub Release oluştur ve install.exe yükle
-                  uses: softprops/action-gh-release@v2
-                  with:
-                    tag_name: ${{ github.ref_name }}
-                    name: "Chevren ${{ github.ref_name }}"
-                    body: |
-                      ## 🪟 Windows Kurulum
-
-                      1. `install.exe` dosyasını indir
-                      2. Çift tıkla — kurulum başlar
-                      3. Kurulum bittikten sonra Enter'a bas
-
-                      > **Not:** Windows Defender uyarı verebilir.
-                      > "Daha fazla bilgi" → "Yine de çalıştır" adımlarını takip et.
-
-                      ---
-
-                      ## 🐧 Linux
-
-                      Arch/CachyOS: AUR'dan `chevren` paketini kur
-                      Diğer distrolarda: `bash install.sh`
-                    draft: false
-                    prerelease: false
-                    files: dist/install.exe
+          files: dist/install.exe
