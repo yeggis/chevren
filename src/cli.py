@@ -98,7 +98,11 @@ def cmd_setup():
 
 def _enable_server_service():
     import shutil
+    import sys
 
+    if sys.platform == "win32":
+        print("Windows'ta servis kurulumu henüz desteklenmiyor.")
+        return
     if not shutil.which("systemctl"):
         return
     service = Path.home() / ".config/systemd/user/chevren-server.service"
@@ -159,7 +163,12 @@ def cmd_run(source: str, no_play: bool):
                     source,
                     f"--sub-file={srt_path}",
                     "--sub-visibility=yes",
-                    "--input-ipc-server=/tmp/chevren-mpv-socket",
+                    "--input-ipc-server="
+                    + (
+                        r"\\.\pipe\chevren-mpv"
+                        if sys.platform == "win32"
+                        else "/tmp/chevren-mpv-socket"
+                    ),
                 ],
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
