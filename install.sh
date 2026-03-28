@@ -41,7 +41,7 @@ EOF
 
 # ── Sudo Wrapper ─────────────────────────────────────────────
 maybe_sudo() {
-  if [[ "${CI:-false}" == "true" ]] || [[ "$EUID" -eq 0 ]]; then
+  if [[ "$EUID" -eq 0 ]]; then
     "$@"
   else
     sudo "$@"
@@ -158,7 +158,7 @@ install_system_deps() {
     # yt-dlp: Ubuntu/Debian depolarındaki versiyon genellikle eski
     if ! command -v yt-dlp &>/dev/null; then
       info "yt-dlp pip ile kuruluyor (depo versiyonu eski olabilir)..."
-      python3 -m pip install --user --upgrade yt-dlp
+      python3 -m pip install --user --break-system-packages --break-system-packages --upgrade yt-dlp
     else
       warn "yt-dlp mevcut ama güncel olmayabilir. 'yt-dlp -U' ile güncelleyebilirsiniz."
     fi
@@ -175,7 +175,7 @@ install_system_deps() {
     # yt-dlp Fedora reposunda var (nobara'da da)
     pkg_install yt-dlp || {
       warn "yt-dlp depodan kurulamadı, pip kullanılıyor..."
-      python3 -m pip install --user --upgrade yt-dlp
+      python3 -m pip install --user --break-system-packages --break-system-packages --upgrade yt-dlp
     }
     ;;
   opensuse)
@@ -183,7 +183,7 @@ install_system_deps() {
     warn "openSUSE: Tam ffmpeg için Packman reposu önerilir."
     warn "Packman: https://en.opensuse.org/SDB:Installing_codecs_from_Packman_repository"
     pkg_install ffmpeg mpv
-    python3 -m pip install --user --upgrade yt-dlp
+    python3 -m pip install --user --break-system-packages --break-system-packages --upgrade yt-dlp
     ;;
   esac
 
@@ -227,12 +227,12 @@ install_pytorch() {
   # Diğer distrolarda pip ile
   if [[ "$CUDA_AVAILABLE" == true ]]; then
     info "PyTorch CUDA sürümü pip ile kuruluyor..."
-    python3 -m pip install --user \
+    python3 -m pip install --user --break-system-packages --break-system-packages \
       torch torchvision torchaudio \
       --index-url https://download.pytorch.org/whl/cu124
   else
     info "PyTorch CPU sürümü pip ile kuruluyor..."
-    python3 -m pip install --user \
+    python3 -m pip install --user --break-system-packages --break-system-packages \
       torch torchvision torchaudio \
       --index-url https://download.pytorch.org/whl/cpu
   fi
@@ -245,9 +245,9 @@ install_python_deps() {
   info "Python bağımlılıkları kuruluyor (faster-whisper, google-genai)..."
 
   # pip güncel mi?
-  python3 -m pip install --user --upgrade pip --quiet
+  python3 -m pip install --user --break-system-packages --break-system-packages --upgrade pip --quiet
 
-  python3 -m pip install --user \
+  python3 -m pip install --user --break-system-packages --break-system-packages \
     "faster-whisper>=1.0.3" \
     "google-genai>=1.0.0"
 
