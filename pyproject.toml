@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chevren"
+version = "1.0.11"
+description = "YouTube videolarını yerel Whisper + Gemini ile Türkçe altyazıya çevirir"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+dependencies = [
+    "faster-whisper>=1.0",
+    "google-generativeai>=0.8",
+    "platformdirs>=4.0",
+    "urllib3>=2.0",
+    "charset-normalizer>=3.0",
+]
+
+[project.scripts]
+chevren = "cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
