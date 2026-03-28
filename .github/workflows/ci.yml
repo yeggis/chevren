@@ -201,13 +201,13 @@ jobs:
 
       - name: Bağımlılık doğrulama
         run: |
-          python -c "import faster_whisper; print('✅ faster-whisper:', faster_whisper.__version__)"
-          python -c "import google.generativeai; print('✅ google-generativeai: OK')"
-          python -c "import platformdirs; print('✅ platformdirs: OK')"
+          python -c "import platformdirs; print('platformdirs: OK')"
+          python -c "import urllib3; print('urllib3: OK')"
+          python -c "import charset_normalizer; print('charset-normalizer: OK')"
 
       - name: Smoke test
         run: |
-          python -c "import sys; sys.path.insert(0, 'src'); from cli import main; print('✅ cli.main import OK')"
+          python -c "import sys; sys.path.insert(0, 'src'); from cli import main; print('cli.main import OK')"
 
   # ══════════════════════════════════════════════════════════
   # 6) ÖZET JOB — Badge ve PR yorumu
