@@ -1,3 +1,5 @@
+[![Chevren CI](https://github.com/yeggis/chevren/actions/workflows/ci.yml/badge.svg)](https://github.com/yeggis/chevren/actions/workflows/ci.yml)
+
 <div align="center">
 
 <img src="https://raw.githubusercontent.com/yeggis/chevren/main/docs/logo.png" alt="Chevren" width="120" />
