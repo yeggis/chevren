@@ -56,6 +56,7 @@ def run(cmd, check=True, dry_run=False):
 def is_root():
     if platform.system() == "Windows":
         import ctypes
+
         return ctypes.windll.shell32.IsUserAnAdmin()
     return os.geteuid() == 0
 
@@ -114,16 +115,36 @@ def install_linux_deps(distro, dry_run=False):
 
     if distro == "arch":
         run(
-            maybe_sudo(["pacman", "-Sy", "--noconfirm",
-                        "python", "python-pip", "ffmpeg", "yt-dlp", "mpv"]),
+            maybe_sudo(
+                [
+                    "pacman",
+                    "-Sy",
+                    "--noconfirm",
+                    "python",
+                    "python-pip",
+                    "ffmpeg",
+                    "yt-dlp",
+                    "mpv",
+                ]
+            ),
             dry_run=dry_run,
         )
 
     elif distro == "debian":
         run(maybe_sudo(["apt", "update"]), dry_run=dry_run)
         run(
-            maybe_sudo(["apt", "install", "-y",
-                        "python3", "python3-pip", "ffmpeg", "yt-dlp", "mpv"]),
+            maybe_sudo(
+                [
+                    "apt",
+                    "install",
+                    "-y",
+                    "python3",
+                    "python3-pip",
+                    "ffmpeg",
+                    "yt-dlp",
+                    "mpv",
+                ]
+            ),
             dry_run=dry_run,
         )
 
@@ -142,16 +163,36 @@ def install_linux_deps(distro, dry_run=False):
         else:
             print("⚠️  Fedora sürümü belirlenemedi, RPM Fusion atlandı.")
         run(
-            maybe_sudo(["dnf", "install", "-y",
-                        "python3", "python3-pip", "ffmpeg", "yt-dlp", "mpv"]),
+            maybe_sudo(
+                [
+                    "dnf",
+                    "install",
+                    "-y",
+                    "python3",
+                    "python3-pip",
+                    "ffmpeg",
+                    "yt-dlp",
+                    "mpv",
+                ]
+            ),
             dry_run=dry_run,
         )
 
     elif distro == "opensuse":
         print("⚠️  openSUSE: ffmpeg için Packman deposu gerekebilir.")
         run(
-            maybe_sudo(["zypper", "install", "-y",
-                        "python3", "python3-pip", "ffmpeg", "yt-dlp", "mpv"]),
+            maybe_sudo(
+                [
+                    "zypper",
+                    "install",
+                    "-y",
+                    "python3",
+                    "python3-pip",
+                    "ffmpeg",
+                    "yt-dlp",
+                    "mpv",
+                ]
+            ),
             check=False,
             dry_run=dry_run,
         )
@@ -178,8 +219,11 @@ def install_windows_deps(dry_run=False):
                     "yt-dlp": "yt-dlp.yt-dlp",
                 }.get(tool)
                 if winget_id:
-                    run(["winget", "install", "--id", winget_id, "-e"],
-                        check=False, dry_run=dry_run)
+                    run(
+                        ["winget", "install", "--id", winget_id, "-e"],
+                        check=False,
+                        dry_run=dry_run,
+                    )
         else:
             print("winget bulunamadı. Lütfen eksik araçları manuel kurun:")
             print("  ffmpeg : https://ffmpeg.org/download.html")
@@ -191,10 +235,17 @@ def install_windows_deps(dry_run=False):
 
 def install_python_deps(dry_run=False):
     print("\n🐍 Python bağımlılıkları kuruluyor...")
-    pip = [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
-    if platform.system() != "Windows":
-        pip.append("--break-system-packages")
-    run(pip, dry_run=dry_run)
+    if Path("requirements.txt").exists():
+        pip = [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
+        if platform.system() != "Windows":
+            pip.append("--break-system-packages")
+        run(pip, dry_run=dry_run)
+    elif Path("pyproject.toml").exists():
+        print("  (requirements.txt yok, pyproject.toml kullanılıyor)")
+        pip = [sys.executable, "-m", "pip", "install", "-e", "."]
+        run(pip, dry_run=dry_run)
+    else:
+        print("⚠️  Ne requirements.txt ne pyproject.toml bulundu, atlandı.")
 
 
 def install_chevren(dry_run=False):
@@ -233,7 +284,9 @@ def main():
     install_chevren(dry_run=args.dry_run)
 
     if args.dry_run:
-        print("\n✅ Dry-run tamamlandı. Gerçek kurulum için --dry-run olmadan çalıştır.")
+        print(
+            "\n✅ Dry-run tamamlandı. Gerçek kurulum için --dry-run olmadan çalıştır."
+        )
     else:
         print("\n✅ Kurulum tamamlandı!")
         print("   chevren --help ile başlayabilirsiniz.")
