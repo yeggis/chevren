@@ -61,15 +61,62 @@ YouTube / Yerel Dosya
 
 ### 📦 Kurulum
 
-#### Arch Linux / CachyOS / Manjaro (Önerilen)
+#### 🚀 Evrensel Kurulum Scripti (Önerilen)
+
+Arch/CachyOS · Debian/Ubuntu · Fedora · openSUSE desteklenir:
 
 ```bash
-# paru ile AUR'dan kur
+git clone https://github.com/yeggis/chevren.git
+cd chevren
+chmod +x install.sh
+./install.sh
+```
+
+> Script, dağıtımınızı otomatik algılar ve uygun paket yöneticisini kullanır.
+
+#### Arch Linux / CachyOS / Manjaro — AUR
+
+```bash
+# paru ile
 paru -S chevren
 
 # ya da yay ile
 yay -S chevren
 ```
+
+#### Debian / Ubuntu
+
+```bash
+sudo apt update
+sudo apt install python3 ffmpeg mpv yt-dlp
+git clone https://github.com/yeggis/chevren.git
+cd chevren
+pip install -r requirements.txt --break-system-packages
+sudo make install
+```
+
+#### Fedora
+
+```bash
+# RPM Fusion Free otomatik etkinleştirilir (ffmpeg için)
+sudo dnf install python3 ffmpeg mpv yt-dlp
+git clone https://github.com/yeggis/chevren.git
+cd chevren
+pip install -r requirements.txt --break-system-packages
+sudo make install
+```
+
+#### openSUSE
+
+```bash
+sudo zypper install python3 ffmpeg mpv yt-dlp
+git clone https://github.com/yeggis/chevren.git
+cd chevren
+pip install -r requirements.txt --break-system-packages
+sudo make install
+```
+
+> **openSUSE notu:** Packman deposu ffmpeg için gerekebilir. Script kurulumu durdurmaz, uyarı verir.
 
 #### Manuel Kurulum
 
@@ -129,7 +176,7 @@ YouTube sayfasında "Chevren ile Çevir" butonu ekleyerek tek tıkla kullanım s
 
 ### 🖥️ Sistem Gereksinimleri
 
-- **OS:** Arch Linux tabanlı dağıtımlar (CachyOS, Manjaro, EndeavourOS…)
+- **OS:** Arch Linux / CachyOS / Manjaro · Debian / Ubuntu · Fedora · openSUSE
 - **GPU:** NVIDIA (CUDA destekli) — CPU modu da çalışır, yavaştır
 - **Python:** 3.10+
 - **Wayland / X11:** Her ikisi de desteklenir
@@ -208,15 +255,62 @@ YouTube / Local File
 
 ### 📦 Installation
 
-#### Arch Linux / CachyOS / Manjaro (Recommended)
+#### 🚀 Universal Install Script (Recommended)
+
+Supports Arch/CachyOS · Debian/Ubuntu · Fedora · openSUSE:
 
 ```bash
-# Install from AUR using paru
+git clone https://github.com/yeggis/chevren.git
+cd chevren
+chmod +x install.sh
+./install.sh
+```
+
+> The script auto-detects your distribution and uses the appropriate package manager.
+
+#### Arch Linux / CachyOS / Manjaro — AUR
+
+```bash
+# using paru
 paru -S chevren
 
 # or using yay
 yay -S chevren
 ```
+
+#### Debian / Ubuntu
+
+```bash
+sudo apt update
+sudo apt install python3 ffmpeg mpv yt-dlp
+git clone https://github.com/yeggis/chevren.git
+cd chevren
+pip install -r requirements.txt --break-system-packages
+sudo make install
+```
+
+#### Fedora
+
+```bash
+# RPM Fusion Free is enabled automatically (required for ffmpeg)
+sudo dnf install python3 ffmpeg mpv yt-dlp
+git clone https://github.com/yeggis/chevren.git
+cd chevren
+pip install -r requirements.txt --break-system-packages
+sudo make install
+```
+
+#### openSUSE
+
+```bash
+sudo zypper install python3 ffmpeg mpv yt-dlp
+git clone https://github.com/yeggis/chevren.git
+cd chevren
+pip install -r requirements.txt --break-system-packages
+sudo make install
+```
+
+> **openSUSE note:** The Packman repository may be required for ffmpeg. The install script will warn but not abort.
 
 #### Manual Installation
 
@@ -276,7 +370,7 @@ Adds a "Translate with Chevren" button on YouTube pages for one-click subtitle g
 
 ### 🖥️ System Requirements
 
-- **OS:** Arch-based distributions (CachyOS, Manjaro, EndeavourOS…)
+- **OS:** Arch Linux / CachyOS / Manjaro · Debian / Ubuntu · Fedora · openSUSE
 - **GPU:** NVIDIA (CUDA-capable) — CPU mode works but is slower
 - **Python:** 3.10+
 - **Display:** Wayland or X11
