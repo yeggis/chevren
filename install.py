@@ -294,3 +294,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # Exe olarak çalışınca konsol penceresi anında kapanmasın.
+    # sys.frozen sadece PyInstaller exe'sinde True olur —
+    # normal "python install.py" çalıştırınca bu satır işlemez.
+    if getattr(sys, "frozen", False):
+        input("\nKurulum tamamlandı. Çıkmak için Enter'a bas...")
