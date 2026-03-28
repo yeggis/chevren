@@ -127,8 +127,7 @@ ensure_python() {
   if ! command -v python3 &>/dev/null; then
     info "Python3 kuruluyor..."
     case "$PKG_FAMILY" in
-    arch) pkg_install python ;;
-    debian) pkg_install python3 python3-pip python3-venv ;;
+    arch) pkg_install python python-pip ;; debian) pkg_install python3 python3-pip python3-venv ;;
     fedora) pkg_install python3 python3-pip ;;
     opensuse) pkg_install python3 python3-pip ;;
     esac
