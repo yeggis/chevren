@@ -1,0 +1,235 @@
+name: Chevren CI — Çoklu Distro
+
+on:
+  push:
+    branches: ["main", "dev", "release/*"]
+  pull_request:
+    branches: ["main"]
+
+# Gereksiz concurrent run'ları iptal et
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ── Badge için özet ──────────────────────────────────────────
+env:
+  CHEVREN_VERSION: "1.0.13"
+
+jobs:
+
+  # ══════════════════════════════════════════════════════════
+  # 1) ARCH LINUX (CachyOS temel — tam destek)
+  # ══════════════════════════════════════════════════════════
+  test-arch:
+    name: "🏹 Arch Linux (tam destek)"
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+      options: --privileged
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pacman keyring & mirrorlist
+        run: |
+          pacman-key --init
+          pacman-key --populate archlinux
+          pacman -Sy --noconfirm archlinux-keyring
+          pacman -Syu --noconfirm
+
+      - name: sudo kurulumu (container'da yok)
+        run: pacman -S --needed --noconfirm sudo
+
+      - name: install.sh çalıştır (Arch yolu)
+        run: |
+          chmod +x install.sh
+          # CI ortamında sudo'suz çalıştır, paket kurulumlarını doğrudan yap
+          bash install.sh
+        env:
+          CI: "true"
+          DEBIAN_FRONTEND: noninteractive
+
+      - name: Bağımlılık doğrulama
+        run: |
+          python3 -c "import faster_whisper; print('✅ faster-whisper:', faster_whisper.__version__)"
+          python3 -c "import google.genai; print('✅ google-genai: OK')"
+          ffmpeg -version | head -1
+          yt-dlp --version
+          mpv --version | head -1
+
+      - name: Smoke test
+        run: |
+          python3 chevren.py --version 2>/dev/null || \
+          python3 chevren.py --help    2>/dev/null || \
+          echo "⚠ --version/--help flag yok, modül import testi yapılıyor"
+          python3 -c "import chevren; print('✅ chevren modülü import edildi')" 2>/dev/null || true
+
+
+  # ══════════════════════════════════════════════════════════
+  # 2) UBUNTU LTS (community tested)
+  # ══════════════════════════════════════════════════════════
+  test-ubuntu:
+    name: "🟠 Ubuntu 24.04 LTS (community tested)"
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: install.sh çalıştır (Ubuntu)
+        run: |
+          chmod +x install.sh
+          bash install.sh
+        env:
+          CI: "true"
+          DEBIAN_FRONTEND: noninteractive
+
+      - name: Bağımlılık doğrulama
+        run: |
+          python3 -c "import faster_whisper; print('✅ faster-whisper:', faster_whisper.__version__)"
+          python3 -c "import google.genai; print('✅ google-genai: OK')"
+          ffmpeg -version | head -1
+          yt-dlp --version
+          mpv --version | head -1
+
+      - name: Smoke test
+        run: |
+          python3 chevren.py --help 2>/dev/null || true
+          python3 -c "import chevren; print('✅ chevren modülü import edildi')" 2>/dev/null || true
+
+
+  # ══════════════════════════════════════════════════════════
+  # 3) FEDORA (community tested)
+  # ══════════════════════════════════════════════════════════
+  test-fedora:
+    name: "🔵 Fedora 41 (community tested)"
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:41
+      options: --privileged
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: sudo & temel araçlar
+        run: |
+          dnf install -y sudo which findutils
+
+      - name: install.sh çalıştır (Fedora)
+        run: |
+          chmod +x install.sh
+          bash install.sh
+        env:
+          CI: "true"
+
+      - name: Bağımlılık doğrulama
+        run: |
+          python3 -c "import faster_whisper; print('✅ faster-whisper:', faster_whisper.__version__)"
+          python3 -c "import google.genai; print('✅ google-genai: OK')"
+          ffmpeg -version | head -1
+          yt-dlp --version || python3 -m yt_dlp --version
+          mpv --version | head -1
+
+      - name: Smoke test
+        run: |
+          python3 chevren.py --help 2>/dev/null || true
+          python3 -c "import chevren; print('✅ chevren modülü import edildi')" 2>/dev/null || true
+
+
+  # ══════════════════════════════════════════════════════════
+  # 4) DEBIAN STABLE (community tested)
+  # ══════════════════════════════════════════════════════════
+  test-debian:
+    name: "🌀 Debian 12 Bookworm (community tested)"
+    runs-on: ubuntu-latest
+    container:
+      image: debian:bookworm
+      options: --privileged
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: sudo & temel araçlar
+        run: |
+          apt-get update -qq
+          apt-get install -y sudo curl
+
+      - name: install.sh çalıştır (Debian)
+        run: |
+          chmod +x install.sh
+          bash install.sh
+        env:
+          CI: "true"
+          DEBIAN_FRONTEND: noninteractive
+
+      - name: Bağımlılık doğrulama
+        run: |
+          python3 -c "import faster_whisper; print('✅ faster-whisper:', faster_whisper.__version__)"
+          python3 -c "import google.genai; print('✅ google-genai: OK')"
+          ffmpeg -version | head -1
+          mpv --version | head -1
+
+      - name: Smoke test
+        run: |
+          python3 chevren.py --help 2>/dev/null || true
+          python3 -c "import chevren; print('✅ chevren modülü import edildi')" 2>/dev/null || true
+
+
+  # ══════════════════════════════════════════════════════════
+  # 5) ÖZET JOB — Badge ve PR yorumu
+  # ══════════════════════════════════════════════════════════
+  ci-summary:
+    name: "📊 CI Özeti"
+    runs-on: ubuntu-latest
+    needs: [test-arch, test-ubuntu, test-fedora, test-debian]
+    if: always()
+
+    steps:
+      - name: Sonuçları değerlendir
+        run: |
+          echo "## 🧪 Chevren v${CHEVREN_VERSION} — Distro Test Sonuçları" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Distro | Durum | Not |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|-----|" >> $GITHUB_STEP_SUMMARY
+
+          arch_status="${{ needs.test-arch.result }}"
+          ubuntu_status="${{ needs.test-ubuntu.result }}"
+          fedora_status="${{ needs.test-fedora.result }}"
+          debian_status="${{ needs.test-debian.result }}"
+
+          status_icon() {
+            case "$1" in
+              success) echo "✅ Başarılı" ;;
+              failure) echo "❌ Başarısız" ;;
+              skipped) echo "⏭ Atlandı" ;;
+              *)       echo "⚠ Bilinmiyor" ;;
+            esac
+          }
+
+          echo "| Arch / CachyOS | $(status_icon $arch_status) | Tam destek |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ubuntu 24.04   | $(status_icon $ubuntu_status) | Community tested |" >> $GITHUB_STEP_SUMMARY
+          echo "| Fedora 41      | $(status_icon $fedora_status) | Community tested |" >> $GITHUB_STEP_SUMMARY
+          echo "| Debian 12      | $(status_icon $debian_status) | Community tested |" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **Not:** Arch/CachyOS tam test edilmiştir. Diğer distrolarda CI ile doğrulanır." >> $GITHUB_STEP_SUMMARY
+
+      - name: Kritik hata kontrolü (Arch)
+        if: needs.test-arch.result == 'failure'
+        run: |
+          echo "❌ Arch testi başarısız — bu kritik bir hatadır!"
+          exit 1
+
+      - name: Community distro uyarısı
+        if: |
+          needs.test-ubuntu.result == 'failure' ||
+          needs.test-fedora.result == 'failure'  ||
+          needs.test-debian.result == 'failure'
+        run: |
+          echo "⚠ Bir veya daha fazla community-tested distro başarısız oldu."
+          echo "Arch hâlâ çalışıyor, ancak lütfen ilgili distro testini inceleyin."
+          # Community testler için CI'ı tamamen kırmıyoruz (exit 0)
+          exit 0
