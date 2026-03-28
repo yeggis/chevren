@@ -7,3 +7,4 @@ models/
 server/target/
 *.zip
 *.pkg.tar.zst
+*.xpi
