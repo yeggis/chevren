@@ -15,7 +15,7 @@ depends=(
 )
 makedepends=('python-pip' 'python-virtualenv')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/yeggis/$pkgname/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('63041614b180a9ecabf5521dbcd47fcd47850d1c346c82d06edac8fa292c9aad')
+sha256sums=('d76dfcba38d99444191ce384ea8db9e48a292e7afb49ce6a0d1afef2c0668528')
 
 package() {
   cd "$srcdir/$pkgname-$pkgver"
