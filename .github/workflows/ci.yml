@@ -195,10 +195,9 @@ jobs:
       - name: pip güncelle
         run: python -m pip install --upgrade pip
 
-      - name: Python bağımlılıklarını kur (install.py --skip-deps)
-        run: python install.py --skip-deps
-        env:
-          CI: "true"
+      - name: Temel bağımlılıkları kur
+        run: |
+          python -m pip install platformdirs urllib3 charset-normalizer
 
       - name: Bağımlılık doğrulama
         run: |
