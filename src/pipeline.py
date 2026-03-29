@@ -65,7 +65,6 @@ GEMINI_FALLBACK_MODELS = [
 
 def _translate_chunk(client, model_name: str, blocks: list[dict], chunk_index: int, exhausted_models: set = None) -> list[dict]:
     """Bir segment grubunu Türkçe'ye çevirir.
-
     Kota dolduğunda: o modeli exhausted_models'e ekle, AYNI CHUNK'I sonraki
     modelle hemen dene. Başka bir hata olduğunda: max_retries kadar bekleyerek
     tekrar dene. Tüm modeller tükenirse zaten chunk'ı İngilizce bırak.
@@ -73,13 +72,15 @@ def _translate_chunk(client, model_name: str, blocks: list[dict], chunk_index: i
     if exhausted_models is None:
         exhausted_models = set()
 
+    # Sadece text satırlarını gönder — timestamp ve numara gösterme
+    texts = [b["text"] for b in blocks]
+    numbered = "\n".join(f"{i+1}. {t}" for i, t in enumerate(texts))
     prompt = (
-        "Translate the following SRT subtitles to Turkish. "
-        "CRITICAL: Copy every timestamp line (format HH:MM:SS,mmm --> HH:MM:SS,mmm) EXACTLY as-is. "
-        "CRITICAL: Copy every number line (1, 2, 3...) EXACTLY as-is. "
-        "Translate ONLY the text lines. "
-        "Output ONLY the SRT content, no explanations.\n\n"
-        + _blocks_to_srt(blocks)
+        "Translate each numbered line to Turkish. "
+        "Output ONLY the translations, one per line, with the same numbers. "
+        "Example: '1. Hello' → '1. Merhaba'. "
+        "Do not add any other text or explanation.\n\n"
+        + numbered
     )
 
     all_models = [model_name] + [m for m in GEMINI_FALLBACK_MODELS if m != model_name]
@@ -93,11 +94,21 @@ def _translate_chunk(client, model_name: str, blocks: list[dict], chunk_index: i
         for attempt in range(3):
             try:
                 tr_text = client.models.generate_content(model=model, contents=prompt).text.strip()
-                tr_text = tr_text.replace("```srt", "").replace("```", "").strip()
-                tr_chunk = _parse_srt(tr_text)
-                # Eksik blok varsa İngilizcesiyle doldur
-                while len(tr_chunk) < len(blocks):
-                    tr_chunk.append(blocks[len(tr_chunk)])
+                # Numaralı satırları parse et: "1. metin" → ["metin", ...]
+                tr_lines = {}
+                for line in tr_text.splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    import re
+                    m = re.match(r'^(\d+)\.\s*(.*)', line)
+                    if m:
+                        tr_lines[int(m.group(1))] = m.group(2)
+                # Timestamp'leri orijinalden al, sadece text'i Gemini'den al
+                tr_chunk = []
+                for i, b in enumerate(blocks):
+                    translated_text = tr_lines.get(i + 1, b["text"])
+                    tr_chunk.append({**b, "text": translated_text})
                 success = True
                 return tr_chunk
             except Exception as e:
@@ -154,7 +165,7 @@ def _reload_mpv_subs():
     """mpv'ye altyazıyı yeniden yüklemesini söyler."""
     try:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.connect("/tmp/chevren-mpv-socket")
+        sock.connect("/tmp/chevren-mpv.sock")
         sock.sendall(b'{ "command": ["sub-reload"] }\n')
         sock.close()
     except Exception:
