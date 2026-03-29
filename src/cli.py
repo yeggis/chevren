@@ -89,6 +89,9 @@ def cmd_setup():
     player = input(f"Oynatıcı [{cfg.get('player', 'mpv')}]: ").strip()
     if player:
         cfg["player"] = player
+    browser = input(f"Tarayıcı cookie için [{cfg.get('browser', 'firefox')}]: ").strip()
+    if browser:
+        cfg["browser"] = browser
 
     config.save(cfg)
     print("\nAyarlar kaydedildi.")

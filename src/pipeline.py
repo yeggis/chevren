@@ -46,11 +46,24 @@ def _blocks_to_srt(blocks: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _yt_dlp_args(source: str, output: str) -> list:
+    base = ["yt-dlp", "-f", "140", source, "-o", output]
+    browser = config.get("browser")
+    if browser:
+        return base + ["--cookies-from-browser", browser]
+    import shutil
+
+    for b in ["firefox", "chromium", "chrome", "brave"]:
+        if shutil.which(b):
+            return base + ["--cookies-from-browser", b]
+    return base
+
+
 def _extract_audio(source: str, workdir: Path) -> Path:
     wav = workdir / "audio.wav"
     if source.startswith("http"):
         m4a = workdir / "audio.m4a"
-        subprocess.run(["yt-dlp", "-f", "140", source, "-o", str(m4a)], check=True)
+        subprocess.run(_yt_dlp_args(source, str(m4a)), check=True)
         subprocess.run(
             ["ffmpeg", "-y", "-i", str(m4a), "-ar", "16000", "-ac", "1", str(wav)],
             check=True,
