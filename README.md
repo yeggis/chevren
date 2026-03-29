@@ -20,7 +20,7 @@
 [![AUR](https://img.shields.io/badge/AUR-chevren-blue?logo=archlinux&logoColor=white)](https://aur.archlinux.org/packages/chevren)
 [![Firefox Eklentisi](https://img.shields.io/badge/Firefox-Eklenti%20v0.1.1-orange?logo=firefox)](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.1)
 [![Lisans](https://img.shields.io/badge/lisans-MIT-green)](LICENSE)
-[![Sürüm](https://img.shields.io/badge/sürüm-1.0.13-brightgreen)](https://github.com/yeggis/chevren/releases)
+[![Sürüm](https://img.shields.io/badge/sürüm-1.0.14-brightgreen)](https://github.com/yeggis/chevren/releases)
 
 </div>
 
@@ -123,21 +123,21 @@ python install.py
 
 #### Windows
 
+**Seçenek A — Exe ile kurulum (Git gerekmez):**
+1. [Releases](https://github.com/yeggis/chevren/releases/tag/v1.0.14) sayfasından `install.exe` indir
+2. Çift tıkla, kurulum başlar
+3. Kurulum bitince Enter'a bas
+
+> Windows Defender uyarı verebilir: "Daha fazla bilgi" → "Yine de çalıştır"
+
+**Seçenek B — Script ile kurulum:**
 ```bash
 git clone https://github.com/yeggis/chevren.git
 cd chevren
 python install.py
 ```
 
-> `ffmpeg`, `mpv` ve `yt-dlp` otomatik olarak `winget` aracılığıyla kurulur. `winget` yoksa manuel kurulum bağlantıları gösterilir.
-
-#### Manuel Kurulum
-
-```bash
-git clone https://github.com/yeggis/chevren.git
-cd chevren
-make install
-```
+> `ffmpeg`, `mpv` ve `yt-dlp` otomatik olarak `winget` aracılığıyla kurulur.
 
 #### Bağımlılıklar
 
@@ -195,6 +195,7 @@ YouTube sayfasında "Chevren ile Çevir" butonu ekleyerek tek tıkla kullanım s
 
 | Sürüm | Tarih | Notlar |
 |---|---|---|
+| v1.0.14 | 2026-03-28 | Windows exe desteği, release.yml düzeltildi |
 | v1.0.13 | 2026-03-27 | AUR kararlı sürüm, pip RECORD korunuyor |
 | ext-v0.1.1 | 2026-03-27 | Otomatik güncelleme altyapısı eklendi |
 | ext-v0.1.0 | 2026-03-20 | İlk yayın |
@@ -227,7 +228,7 @@ git push origin main
 [![AUR](https://img.shields.io/badge/AUR-chevren-blue?logo=archlinux&logoColor=white)](https://aur.archlinux.org/packages/chevren)
 [![Firefox Extension](https://img.shields.io/badge/Firefox-Extension%20v0.1.1-orange?logo=firefox)](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.1)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.13-brightgreen)](https://github.com/yeggis/chevren/releases)
+[![Version](https://img.shields.io/badge/version-1.0.14-brightgreen)](https://github.com/yeggis/chevren/releases)
 
 </div>
 
@@ -330,21 +331,21 @@ python install.py
 
 #### Windows
 
+**Option A — Exe installer (no Git required):**
+1. Download `install.exe` from the [Releases](https://github.com/yeggis/chevren/releases/tag/v1.0.14) page
+2. Double-click to run
+3. Press Enter when installation completes
+
+> Windows Defender may show a warning: click "More info" → "Run anyway"
+
+**Option B — Script installation:**
 ```bash
 git clone https://github.com/yeggis/chevren.git
 cd chevren
 python install.py
 ```
 
-> `ffmpeg`, `mpv`, and `yt-dlp` are installed automatically via `winget`. If winget is unavailable, manual download links are displayed.
-
-#### Manual Installation
-
-```bash
-git clone https://github.com/yeggis/chevren.git
-cd chevren
-make install
-```
+> `ffmpeg`, `mpv`, and `yt-dlp` are installed automatically via `winget`.
 
 #### Dependencies
 
@@ -402,6 +403,7 @@ Adds a "Translate with Chevren" button on YouTube pages for one-click subtitle g
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.0.14 | 2026-03-28 | Windows exe support, release.yml fixed |
 | v1.0.13 | 2026-03-27 | Stable AUR release, pip RECORD preserved |
 | ext-v0.1.1 | 2026-03-27 | Auto-update infrastructure added |
 | ext-v0.1.0 | 2026-03-20 | Initial release |
