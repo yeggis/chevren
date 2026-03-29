@@ -48,15 +48,62 @@ def _blocks_to_srt(blocks: list[dict]) -> str:
 
 def _yt_dlp_args(source: str, output: str) -> list:
     base = ["yt-dlp", "-f", "140", source, "-o", output]
+
+    # Config'de browser varsa kullan
     browser = config.get("browser")
     if browser:
         return base + ["--cookies-from-browser", browser]
+
+    import shutil
+    from pathlib import Path
+
+    # Zen browser — Firefox tabanlı, özel profil dizini
+    zen_dir = Path.home() / ".zen"
+    if zen_dir.exists():
+        best = None
+        best_size = 0
+        for profile in zen_dir.iterdir():
+            if not profile.is_dir():
+                continue
+            cookies_file = profile / "cookies.sqlite"
+            if cookies_file.exists():
+                size = cookies_file.stat().st_size
+                if size > best_size:
+                    best_size = size
+                    best = profile
+        if best:
+            return base + ["--cookies-from-browser", f"firefox:{best}"]
+    return base
+
+
+def _yt_dlp_cookie_args() -> list:
+    """MPV için --ytdl-raw-options cookie argümanları döner."""
+    browser = config.get("browser")
+    if browser:
+        return [f"--ytdl-raw-options=cookies-from-browser={browser}"]
+    from pathlib import Path
+
+    zen_dir = Path.home() / ".zen"
+    if zen_dir.exists():
+        best = None
+        best_size = 0
+        for profile in zen_dir.iterdir():
+            if not profile.is_dir():
+                continue
+            cookies_file = profile / "cookies.sqlite"
+            if cookies_file.exists():
+                size = cookies_file.stat().st_size
+                if size > best_size:
+                    best_size = size
+                    best = profile
+        if best:
+            return [f"--ytdl-raw-options=cookies-from-browser=firefox:{best}"]
     import shutil
 
     for b in ["firefox", "chromium", "chrome", "brave"]:
         if shutil.which(b):
-            return base + ["--cookies-from-browser", b]
-    return base
+            return [f"--ytdl-raw-options=cookies-from-browser={b}"]
+    return []
 
 
 def _extract_audio(source: str, workdir: Path) -> Path:

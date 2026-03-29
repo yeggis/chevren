@@ -160,19 +160,16 @@ def cmd_run(source: str, no_play: bool):
         if no_play or mpv_started:
             return
         try:
+            cookie_args = pipeline._yt_dlp_cookie_args()
             subprocess.Popen(
                 [
                     player,
                     source,
                     f"--sub-file={srt_path}",
                     "--sub-visibility=yes",
-                    "--input-ipc-server="
-                    + (
-                        r"\\.\pipe\chevren-mpv"
-                        if sys.platform == "win32"
-                        else "/tmp/chevren-mpv-socket"
-                    ),
-                ],
+                    "--input-ipc-server=/tmp/chevren-mpv.sock",
+                ]
+                + cookie_args,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -180,8 +177,8 @@ def cmd_run(source: str, no_play: bool):
             )
             print(f"▶ {player} açılıyor")
             mpv_started = True
-        except FileNotFoundError:
-            print(f"mpv bulunamadı. SRT: {srt_path}")
+        except Exception as e:
+            print(f"mpv açılamadı: {e}")
 
     srt = pipeline.run_streaming(source, workdir, on_ready=on_ready)
 
