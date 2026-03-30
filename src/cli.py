@@ -89,15 +89,106 @@ def cmd_setup():
     player = input(f"Oynatıcı [{cfg.get('player', 'mpv')}]: ").strip()
     if player:
         cfg["player"] = player
-    browser = input(f"Tarayıcı cookie için [{cfg.get('browser', 'firefox')}]: ").strip()
-    if browser:
-        cfg["browser"] = browser
-
     config.save(cfg)
     print("\nAyarlar kaydedildi.")
     print(f"Donanım: {config.hardware_summary()}")
     _enable_server_service()
+    _setup_cookies()
 
+def _setup_cookies():
+    import shutil
+    COOKIE_FILE = Path.home() / ".config" / "chevren" / "cookies.txt"
+
+    print()
+    print("─" * 50)
+    print("Cookie kurulumu (opsiyonel)")
+    print("─" * 50)
+    print("Cookie, YouTube'da giriş yaptığınız hesabınızı")
+    print("kullanarak yaş kısıtlı veya özel içerikleri")
+    print("izlemenizi sağlar.")
+    print()
+
+    if COOKIE_FILE.exists() and COOKIE_FILE.stat().st_size > 0:
+        print(f"✓ Mevcut cookie dosyası bulundu: {COOKIE_FILE}")
+        yenile = input("Yenilemek ister misiniz? [e/H]: ").strip().lower()
+        if yenile != "e":
+            return
+        print()
+
+    zen_dir = Path.home() / ".zen"
+    if zen_dir.exists():
+        for p in zen_dir.iterdir():
+            if p.is_dir() and (p / "cookies.sqlite").exists():
+                print("✓ Zen Browser algılandı — cookie otomatik kullanılacak.")
+                print("  Cookie kurulumu gerekmez, devam ediliyor.")
+                return
+
+    for b, ad in [("firefox", "Firefox"), ("librewolf", "Librewolf")]:
+        if shutil.which(b):
+            print(f"✓ {ad} algılandı — cookie otomatik kullanılacak.")
+            print("  Cookie kurulumu gerekmez, devam ediliyor.")
+            return
+
+    print("Tarayıcınız otomatik algılanamadı.")
+    print()
+    print("Tarayıcınızı seçin:")
+    print("  1) Chrome / Brave / Edge / Vivaldi")
+    print("  2) Firefox")
+    print("  3) Zen Browser")
+    print("  4) Atla")
+    print()
+    secim = input("Seçiminiz [1-4]: ").strip()
+
+    if secim == "1":
+        print()
+        print("Chrome tabanlı tarayıcılar için:")
+        print()
+        print("1. Şu eklentiyi tarayıcınıza kurun:")
+        print("   https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc")
+        print()
+        print("2. YouTube'a gidin ve hesabınıza giriş yapın.")
+        print()
+        print("3. Eklenti ikonuna tıklayın → 'Export' → dosyayı kaydedin.")
+        print()
+        print(f"4. Dosyayı şu konuma taşıyın:")
+        print(f"   {COOKIE_FILE}")
+        print()
+        print(f"   Dizini oluşturmak için:")
+        print(f"   mkdir -p {COOKIE_FILE.parent}")
+
+    elif secim == "2":
+        print()
+        print("Firefox için:")
+        print()
+        print("1. Şu eklentiyi kurun:")
+        print("   https://addons.mozilla.org/firefox/addon/cookies-txt/")
+        print()
+        print("2. YouTube'a gidin ve hesabınıza giriş yapın.")
+        print()
+        print("3. Eklenti ikonuna tıklayın → 'Current Site' → kaydedin.")
+        print()
+        print(f"4. Dosyayı şu konuma taşıyın:")
+        print(f"   {COOKIE_FILE}")
+
+    elif secim == "3":
+        print()
+        print("Zen Browser ~/.zen dizininde profil bulunamadı.")
+        print("Zen kuruluysa bir kez açıp kapatmayı deneyin.")
+        return
+
+    else:
+        print("Cookie kurulumu atlandı.")
+        print("Daha sonra tekrar çalıştırmak için: chevren setup")
+        return
+
+    print()
+    input("Dosyayı yerleştirdikten sonra Enter'a basın...")
+
+    if COOKIE_FILE.exists() and COOKIE_FILE.stat().st_size > 0:
+        print("✓ Cookie dosyası bulundu, kurulum tamamlandı.")
+    else:
+        print(f"⚠ Dosya bulunamadı: {COOKIE_FILE}")
+        print("  Daha sonra manuel olarak yerleştirebilirsiniz.")
 
 def _enable_server_service():
     import shutil
