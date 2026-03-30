@@ -20,7 +20,7 @@
 [![AUR](https://img.shields.io/badge/AUR-chevren-blue?logo=archlinux&logoColor=white)](https://aur.archlinux.org/packages/chevren)
 [![Firefox Eklentisi](https://img.shields.io/badge/Firefox-Eklenti%20v0.1.1-orange?logo=firefox)](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.1)
 [![Lisans](https://img.shields.io/badge/lisans-MIT-green)](LICENSE)
-[![Sürüm](https://img.shields.io/badge/sürüm-1.0.14-brightgreen)](https://github.com/yeggis/chevren/releases)
+[![Sürüm](https://img.shields.io/badge/sürüm-1.0.16-brightgreen)](https://github.com/yeggis/chevren/releases)
 
 </div>
 
@@ -124,7 +124,7 @@ python install.py
 #### Windows
 
 **Seçenek A — Exe ile kurulum (Git gerekmez):**
-1. [Releases](https://github.com/yeggis/chevren/releases/tag/v1.0.14) sayfasından `install.exe` indir
+1. [Releases](https://github.com/yeggis/chevren/releases/latest) sayfasından `install.exe` indir
 2. Çift tıkla, kurulum başlar
 3. Kurulum bitince Enter'a bas
 
@@ -151,15 +151,51 @@ python install.py
 
 ### ⚙️ Yapılandırma
 
-İlk çalıştırmadan önce Gemini API anahtarınızı ayarlayın:
+#### İlk Kurulum Sihirbazı
+
+İlk çalıştırmadan önce `chevren setup` komutunu çalıştırın:
 
 ```bash
 chevren setup
-# Ya da doğrudan:
-chevren config gemini_api_key ANAHTARINIZ
 ```
 
-> **Not:** Gemini API anahtarını [Google AI Studio](https://aistudio.google.com/app/apikey)'dan ücretsiz alabilirsiniz.
+Sihirbaz sizi adım adım yönlendirir:
+
+1. **Gemini API anahtarı** — [Google AI Studio](https://aistudio.google.com/app/apikey)'dan ücretsiz alabilirsiniz
+2. **Cookie kurulumu** — YouTube'un üye içeriklerine (age-restricted, giriş gerektiren) erişim için isteğe bağlıdır; sihirbaz kullandığınız tarayıcıya göre uygun eklenti linkini gösterir
+
+> API anahtarını doğrudan da ayarlayabilirsiniz:
+> ```bash
+> chevren config gemini_api_key ANAHTARINIZ
+> ```
+
+#### 🍪 Cookie Kurulumu (İsteğe Bağlı)
+
+Bazı YouTube videoları (yaşa kısıtlı, giriş gerektiren) için tarayıcı cookie'lerinizin Chevren'e aktarılması gerekir.
+
+**Desteklenen tarayıcılar:** Firefox, Zen, Librewolf, Vivaldi, Opera
+
+> ⚠️ **Chrome ve Edge (Linux):** Chromium tabanlı tarayıcılarda Linux üzerinde cookie şifrelemesi (`kwallet`/`gnome-keyring`) nedeniyle cookie aktarımı şu an çalışmamaktadır. Bu tarayıcıları kullanıyorsanız aşağıdaki manuel yöntemi tercih edin.
+
+**Yöntem 1 — `chevren setup` ile (Önerilen):**
+
+```bash
+chevren setup
+```
+
+Sihirbaz tarayıcınızı seçmenizi ister ve uygun "Get cookies.txt" eklentisinin linkini gösterir.
+
+**Yöntem 2 — Manuel:**
+
+1. Tarayıcınıza uygun "Get cookies.txt LOCALLY" eklentisini yükleyin
+2. YouTube'da oturum açın
+3. Eklenti ile `youtube.com` cookie'lerini dışa aktarın (**Netscape formatı**)
+4. Dosyayı şuraya kaydedin:
+   ```
+   ~/.config/chevren/cookies.txt
+   ```
+
+Chevren, bu dosyayı otomatik olarak algılar ve `yt-dlp`'ye iletir.
 
 ### 🚀 Kullanım
 
@@ -195,6 +231,8 @@ YouTube sayfasında "Chevren ile Çevir" butonu ekleyerek tek tıkla kullanım s
 
 | Sürüm | Tarih | Notlar |
 |---|---|---|
+| v1.0.16 | 2026-03-30 | PKGBUILD: cargo build + systemd servis + chevren.install hooks |
+| v1.0.15 | 2026-03-30 | Cookie dosyası desteği, `chevren setup` sihirbazı, DRY refactor |
 | v1.0.14 | 2026-03-28 | Windows exe desteği, release.yml düzeltildi |
 | v1.0.13 | 2026-03-27 | AUR kararlı sürüm, pip RECORD korunuyor |
 | ext-v0.1.1 | 2026-03-27 | Otomatik güncelleme altyapısı eklendi |
@@ -228,7 +266,7 @@ git push origin main
 [![AUR](https://img.shields.io/badge/AUR-chevren-blue?logo=archlinux&logoColor=white)](https://aur.archlinux.org/packages/chevren)
 [![Firefox Extension](https://img.shields.io/badge/Firefox-Extension%20v0.1.1-orange?logo=firefox)](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.1)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.14-brightgreen)](https://github.com/yeggis/chevren/releases)
+[![Version](https://img.shields.io/badge/version-1.0.16-brightgreen)](https://github.com/yeggis/chevren/releases)
 
 </div>
 
@@ -332,7 +370,7 @@ python install.py
 #### Windows
 
 **Option A — Exe installer (no Git required):**
-1. Download `install.exe` from the [Releases](https://github.com/yeggis/chevren/releases/tag/v1.0.14) page
+1. Download `install.exe` from the [Releases](https://github.com/yeggis/chevren/releases/latest) page
 2. Double-click to run
 3. Press Enter when installation completes
 
@@ -359,15 +397,51 @@ python install.py
 
 ### ⚙️ Configuration
 
-Set up your Gemini API key before first use:
+#### First-Time Setup Wizard
+
+Run `chevren setup` before first use:
 
 ```bash
 chevren setup
-# Or directly:
-chevren config gemini_api_key YOUR_KEY
 ```
 
-> **Note:** Get a free Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey).
+The wizard walks you through:
+
+1. **Gemini API key** — get one for free at [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. **Cookie setup** — optional, required for age-restricted or login-gated YouTube videos; the wizard shows the correct browser extension link based on your browser choice
+
+> You can also set the API key directly:
+> ```bash
+> chevren config gemini_api_key YOUR_KEY
+> ```
+
+#### 🍪 Cookie Setup (Optional)
+
+Some YouTube videos (age-restricted, login-required) need your browser cookies to be passed to Chevren.
+
+**Supported browsers:** Firefox, Zen, Librewolf, Vivaldi, Opera
+
+> ⚠️ **Chrome and Edge (Linux):** Cookie extraction is currently not supported on Linux for Chromium-based browsers due to keyring encryption (`kwallet`/`gnome-keyring`). Use the manual method below or switch to a supported browser.
+
+**Method 1 — Via `chevren setup` (Recommended):**
+
+```bash
+chevren setup
+```
+
+The wizard prompts you to select your browser and links you to the appropriate "Get cookies.txt" extension.
+
+**Method 2 — Manual:**
+
+1. Install the "Get cookies.txt LOCALLY" extension for your browser
+2. Log in to YouTube
+3. Export cookies for `youtube.com` (**Netscape format**)
+4. Save the file to:
+   ```
+   ~/.config/chevren/cookies.txt
+   ```
+
+Chevren detects this file automatically and passes it to `yt-dlp`.
 
 ### 🚀 Usage
 
@@ -403,6 +477,8 @@ Adds a "Translate with Chevren" button on YouTube pages for one-click subtitle g
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.0.16 | 2026-03-30 | PKGBUILD: cargo build + systemd service + chevren.install hooks |
+| v1.0.15 | 2026-03-30 | Cookie file support, `chevren setup` wizard, DRY refactor |
 | v1.0.14 | 2026-03-28 | Windows exe support, release.yml fixed |
 | v1.0.13 | 2026-03-27 | Stable AUR release, pip RECORD preserved |
 | ext-v0.1.1 | 2026-03-27 | Auto-update infrastructure added |
