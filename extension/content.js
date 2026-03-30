@@ -343,11 +343,16 @@ function waitForControls() {
 }
 
 // ── URL takibi ────────────────────────────────────────────────────────────────
-
 let lastUrl = location.href;
 setInterval(() => {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
+    // Overlay temizle (yeni video)
+    if (overlayActive) {
+      overlayActive = false;
+      overlayEl?.remove();
+      overlayEl = null;
+    }
     // Butonları temizle (yeni video)
     ["chevren-btn-mpv", "chevren-btn-overlay", "chevren-btn-regen"]
       .forEach(id => document.getElementById(id)?.remove());
