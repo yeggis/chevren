@@ -46,22 +46,26 @@ def _blocks_to_srt(blocks: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _yt_dlp_args(source: str, output: str) -> list:
-    base = ["yt-dlp", "-f", "140", source, "-o", output]
+COOKIE_FILE = Path.home() / ".config" / "chevren" / "cookies.txt"
 
-    # Config'de browser varsa kullan
+
+def _detect_cookie_browser():
+    """
+    Cookie kaynağını döner. Öncelik sırası:
+    1. ~/.config/chevren/cookies.txt varsa → ("file", path)
+    2. Config'de browser ayarı varsa → ("browser", değer)
+    3. Zen otomatik algıla → ("browser", "firefox:/profil")
+    4. Firefox/Librewolf → ("browser", "firefox")
+    5. Hiçbiri → (None, None)
+    """
     browser = config.get("browser")
+    if COOKIE_FILE.exists() and COOKIE_FILE.stat().st_size > 0:
+        return ("file", str(COOKIE_FILE))
     if browser:
-        return base + ["--cookies-from-browser", browser]
-
-    import shutil
-    from pathlib import Path
-
-    # Zen browser — Firefox tabanlı, özel profil dizini
+        return ("browser", browser)
     zen_dir = Path.home() / ".zen"
     if zen_dir.exists():
-        best = None
-        best_size = 0
+        best, best_size = None, 0
         for profile in zen_dir.iterdir():
             if not profile.is_dir():
                 continue
@@ -72,37 +76,31 @@ def _yt_dlp_args(source: str, output: str) -> list:
                     best_size = size
                     best = profile
         if best:
-            return base + ["--cookies-from-browser", f"firefox:{best}"]
+            return ("browser", f"firefox:{best}")
+    import shutil
+    for b in ["firefox", "librewolf"]:
+        if shutil.which(b):
+            return ("browser", b)
+    return (None, None)
+
+
+def _yt_dlp_args(source: str, output: str) -> list:
+    base = ["yt-dlp", "-f", "140", source, "-o", output]
+    kind, value = _detect_cookie_browser()
+    if kind == "file":
+        return base + ["--cookies", value]
+    elif kind == "browser":
+        return base + ["--cookies-from-browser", value]
     return base
 
 
 def _yt_dlp_cookie_args() -> list:
     """MPV için --ytdl-raw-options cookie argümanları döner."""
-    browser = config.get("browser")
-    if browser:
-        return [f"--ytdl-raw-options=cookies-from-browser={browser}"]
-    from pathlib import Path
-
-    zen_dir = Path.home() / ".zen"
-    if zen_dir.exists():
-        best = None
-        best_size = 0
-        for profile in zen_dir.iterdir():
-            if not profile.is_dir():
-                continue
-            cookies_file = profile / "cookies.sqlite"
-            if cookies_file.exists():
-                size = cookies_file.stat().st_size
-                if size > best_size:
-                    best_size = size
-                    best = profile
-        if best:
-            return [f"--ytdl-raw-options=cookies-from-browser=firefox:{best}"]
-    import shutil
-
-    for b in ["firefox", "chromium", "chrome", "brave"]:
-        if shutil.which(b):
-            return [f"--ytdl-raw-options=cookies-from-browser={b}"]
+    kind, value = _detect_cookie_browser()
+    if kind == "file":
+        return [f"--ytdl-raw-options=cookies={value}"]
+    elif kind == "browser":
+        return [f"--ytdl-raw-options=cookies-from-browser={value}"]
     return []
 
 
