@@ -1,5 +1,6 @@
 mod mpv;
 mod routes;
+mod state;
 
 use axum::{
     routing::{get, post},
@@ -17,6 +18,8 @@ async fn main() {
         .allow_methods(Any)
         .allow_headers(Any);
 
+    let shared_state = state::new_shared();
+
     let app = Router::new()
         .route("/status", get(routes::status::handler))
         .route("/open", post(routes::open::handler))
@@ -27,6 +30,7 @@ async fn main() {
             get(routes::subtitle::handler).delete(routes::subtitle::delete_handler),
         )
         .route("/mpv/command", post(routes::mpv_cmd::handler))
+        .with_state(shared_state)
         .layer(cors);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:7373")

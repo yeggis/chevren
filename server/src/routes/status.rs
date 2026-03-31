@@ -1,9 +1,8 @@
-use axum::Json;
-use serde_json::{json, Value};
+use crate::state::SharedState;
+use axum::{extract::State, Json};
+use serde_json::Value;
 
-pub async fn handler() -> Json<Value> {
-    Json(json!({
-        "status": "ok",
-        "version": env!("CARGO_PKG_VERSION")
-    }))
+pub async fn handler(State(state): State<SharedState>) -> Json<Value> {
+    let s = state.lock().unwrap();
+    Json(serde_json::to_value(&*s).unwrap())
 }
