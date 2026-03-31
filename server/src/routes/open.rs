@@ -78,6 +78,11 @@ pub async fn generate_handler(
         }));
     }
 
+    // State'i sıfırla
+    {
+        let mut s = state.lock().unwrap();
+        s.chunk_max = None;
+    }
     // Arka planda başlat
     let state_clone = state.clone();
     let url = req.url.clone();
@@ -118,7 +123,10 @@ async fn run_pipeline_tracked(url: String, state: SharedState) {
                     if let Some(stage) = val["stage"].as_str() {
                         s.stage = stage.to_string();
                     }
-                    s.chunk = val.get("chunk").and_then(|v| v.as_u64()).map(|n| n as u32);
+                    if let Some(c) = val.get("chunk").and_then(|v| v.as_u64()).map(|n| n as u32) {
+                        s.chunk = Some(c);
+                        s.chunk_max = Some(s.chunk_max.unwrap_or(0).max(c));
+                    }
                     s.video_id = val
                         .get("video_id")
                         .and_then(|v| v.as_str())

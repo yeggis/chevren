@@ -383,12 +383,12 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
         if len(pending) >= STREAM_CHUNK:
             chunk_num += 1
             print(f"  Çeviri: chunk {chunk_num} ({seg_count} segment işlendi)")
-            _status(stage="translating", chunk=chunk_num, video_id=video_id)
             translated = _translate_chunk(
                 client, model_name, pending, chunk_num, exhausted_models
             )
             translated = _renumber(translated, blk_count + 1)
             _append_srt(srt_path, translated)
+            _status(stage="translating", chunk=chunk_num, video_id=video_id)
             _reload_mpv_subs(srt_path)
             blk_count += len(translated)
             pending.clear()
@@ -399,12 +399,12 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
     if pending:
         chunk_num += 1
         print(f"  Çeviri: chunk {chunk_num} (son)")
-        _status(stage="translating", chunk=chunk_num, video_id=video_id)
         translated = _translate_chunk(
             client, model_name, pending, chunk_num, exhausted_models
         )
         translated = _renumber(translated, blk_count + 1)
         _append_srt(srt_path, translated)
+        _status(stage="translating", chunk=chunk_num, video_id=video_id)
         _reload_mpv_subs(srt_path)
 
     del model

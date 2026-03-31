@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 pub struct PipelineState {
     pub stage: String,
     pub chunk: Option<u32>,
+    pub chunk_max: Option<u32>,
     pub video_id: Option<String>,
     pub message: Option<String>,
 }

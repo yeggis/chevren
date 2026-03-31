@@ -218,13 +218,11 @@ function startPolling() {
       const data = await res.json();
       const vid = getVideoId();
        if (!data.video_id || data.video_id === vid) {
-        if (
-          data.stage === "translating" &&
-          data.chunk === 1 &&
-          currentStage !== "translating" &&
-          !overlayActive
-        ) {
-          const srtRes = await fetch(`${SERVER}/subtitle/${vid}`).catch(() => null);
+      const shouldAutoOpen =
+          !overlayActive &&
+          (data.stage === "translating" || data.stage === "ready") &&
+          data.chunk_max >= 1;
+        if (shouldAutoOpen) {          const srtRes = await fetch(`${SERVER}/subtitle/${vid}`).catch(() => null);
           if (srtRes && srtRes.ok) {
             const srt = await srtRes.text();
             if (srt.trim()) {
