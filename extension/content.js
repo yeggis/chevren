@@ -5,231 +5,307 @@ function getVideoId() {
   return params.get("v");
 }
 
-// ── Buton enjeksiyonu ────────────────────────────────────────────────────────
-
+// ── Styles ───────────────────────────────────────────────────────────────────
 function injectStyles() {
   if (document.getElementById("chevren-styles")) return;
   const style = document.createElement("style");
   style.id = "chevren-styles";
   style.textContent = `
-    #chevren-btn-mpv,
-    #chevren-btn-overlay,
-    #chevren-btn-regen {
+    #chevren-btn-mpv {
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
-      position: relative;
     }
-    #chevren-tooltip {
-      position: fixed;
-      background: rgba(28,28,28,0.95);
-      color: #fff;
-      font-size: 12px;
-      font-family: sans-serif;
-      padding: 4px 8px;
+    #chevren-strip {
+      margin: 8px 0 4px;
+      padding: 0 2px;
+    }
+    #chevren-strip-main {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 7px 12px;
+      cursor: pointer;
+      overflow: hidden;
+      position: relative;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    #chevren-strip-main:hover {
+      border-color: rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.08);
+    }
+    #chevren-badge {
+      background: #c8a84b;
+      color: #1a1206;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
       border-radius: 4px;
-      pointer-events: none;
-      z-index: 999999;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+      font-family: sans-serif;
+    }
+    #chevren-status-text {
+      font-size: 12px;
+      color: #e0e0e0;
       white-space: nowrap;
-      transform: translateX(-50%);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+      font-family: sans-serif;
+    }
+    #chevren-sub-text {
+      font-size: 11px;
+      color: rgba(255,255,255,0.35);
+      white-space: nowrap;
+      flex-shrink: 0;
+      font-family: sans-serif;
+    }
+    #chevren-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    .cv-dot-idle    { background: rgba(255,255,255,0.2); }
+    .cv-dot-working { background: #c8a84b; animation: cv-pulse 1.4s ease-in-out infinite; }
+    .cv-dot-done    { background: #5cb85c; }
+    .cv-dot-error   { background: #e05c5c; }
+    @keyframes cv-pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%     { opacity:0.3; transform:scale(0.6); }
+    }
+    #chevren-progress-bar {
+      position: absolute;
+      bottom: 0; left: 0;
+      height: 2px;
+      background: #c8a84b;
+      transition: width 0.5s ease;
+    }
+    #chevren-progress-bar.cv-indeterminate {
+      width: 33% !important;
+      animation: cv-slide 1.8s ease-in-out infinite;
+    }
+    @keyframes cv-slide {
+      0%   { left: -33%; }
+      100% { left: 100%; }
     }
   `;
   document.head.appendChild(style);
 }
 
-function initTooltip() {
-  if (document.getElementById("chevren-tooltip")) return;
-  const tip = document.createElement("div");
-  tip.id = "chevren-tooltip";
-  tip.style.display = "none";
-  document.body.appendChild(tip);
-}
-
-function bindTooltip(el, text) {
-  el.setAttribute("data-chevren-tip", text);
-  el.addEventListener("mouseenter", (e) => {
-    const tip = document.getElementById("chevren-tooltip");
-    if (!tip) return;
-    tip.textContent = el.getAttribute("data-chevren-tip");
-    tip.style.display = "block";
-    const rect = el.getBoundingClientRect();
-    tip.style.left = (rect.left + rect.width / 2) + "px";
-    tip.style.top = (rect.top - 32) + "px";
-  });
-  el.addEventListener("mouseleave", () => {
-    const tip = document.getElementById("chevren-tooltip");
-    if (tip) tip.style.display = "none";
-  });
-}
-
-function injectButtons() {
+// ── Controls bar: sadece mpv butonu ─────────────────────────────────────────
+function injectMpvButton() {
   if (document.getElementById("chevren-btn-mpv")) return;
-
   const controls = document.querySelector(".ytp-right-controls");
   if (!controls) return;
-
   injectStyles();
-  initTooltip();
-
-  // mpv butonu
-  const btnMpv = document.createElement("button");
-  btnMpv.id = "chevren-btn-mpv";
-  btnMpv.className = "ytp-button";
-  bindTooltip(btnMpv, "mpv'de aç");
-  btnMpv.innerHTML = `<svg viewBox="0 0 36 36" width="22" height="22">
+  const btn = document.createElement("button");
+  btn.id = "chevren-btn-mpv";
+  btn.className = "ytp-button";
+  btn.title = "mpv'de aç";
+  btn.innerHTML = `<svg viewBox="0 0 36 36" width="22" height="22">
     <path fill="white" d="M8 11v14l12-7L8 11zm14 0v6l5-3-5-3zm0 8v6l5-3-5-3z"/>
   </svg>`;
-  btnMpv.addEventListener("click", openInMpv);
-
-  // Altyazı butonu
-  const btnOverlay = document.createElement("button");
-  btnOverlay.id = "chevren-btn-overlay";
-  btnOverlay.className = "ytp-button";
-  bindTooltip(btnOverlay, "Türkçe altyazı");
-  btnOverlay.innerHTML = `<svg viewBox="0 0 36 36" width="22" height="22">
-    <path fill="white" d="M5 8h26v16H5V8zm3 4v2h16v-2H8zm0 4v2h10v-2H8z" opacity="0.9"/>
-  </svg>`;
-  btnOverlay.addEventListener("click", toggleOverlay);
-
-  // Yeniden oluştur butonu
-  const btnRegen = document.createElement("button");
-  btnRegen.id = "chevren-btn-regen";
-  btnRegen.className = "ytp-button";
-  bindTooltip(btnRegen, "Altyazıyı yeniden oluştur");
-  btnRegen.innerHTML = `<svg viewBox="0 0 36 36" width="22" height="22">
-    <path fill="white" d="M18 8a10 10 0 0 0-9.95 11H5l4 4 4-4H9.1A8 8 0 1 1 18 26v2a10 10 0 0 0 0-20z"/>
-  </svg>`;
-  btnRegen.addEventListener("click", regenerateSubtitle);
-
-  // Sol başa ekle: mpv → altyazı → yeniden oluştur
-  const firstChild = controls.firstChild;
-  controls.insertBefore(btnRegen, firstChild);
-  controls.insertBefore(btnOverlay, btnRegen);
-  controls.insertBefore(btnMpv, btnOverlay);
+  btn.addEventListener("click", openInMpv);
+  controls.insertBefore(btn, controls.firstChild);
 }
 
-// ── mpv modu ─────────────────────────────────────────────────────────────────
+// ── Strip ────────────────────────────────────────────────────────────────────
+function injectStrip() {
+  if (document.getElementById("chevren-strip")) return;
+  const topRow = document.querySelector("ytd-watch-metadata #top-row");
+  if (!topRow) return;
+  injectStyles();
+  const strip = document.createElement("div");
+  strip.id = "chevren-strip";
+  strip.innerHTML = `
+    <div id="chevren-strip-main">
+      <span id="chevren-badge">CV</span>
+      <span id="chevren-status-text">Türkçe altyazı oluştur</span>
+      <span id="chevren-sub-text"></span>
+      <div id="chevren-dot" class="cv-dot-idle"></div>
+      <div id="chevren-progress-bar" style="display:none;width:0;"></div>
+    </div>
+  `;
+  topRow.parentNode.insertBefore(strip, topRow.nextSibling);
+  document
+    .getElementById("chevren-strip-main")
+    .addEventListener("click", onStripClick);
+}
 
-async function openInMpv() {
-  const id = getVideoId();
-  if (!id) return;
+// ── Strip state update ───────────────────────────────────────────────────────
+let currentStage = "idle";
 
-  setTooltip("chevren-btn-mpv", "gönderiliyor...");
+function updateStrip(status) {
+  const statusText = document.getElementById("chevren-status-text");
+  const subText = document.getElementById("chevren-sub-text");
+  const dot = document.getElementById("chevren-dot");
+  const bar = document.getElementById("chevren-progress-bar");
+  if (!statusText) return;
 
-  try {
-    const res = await fetch(`${SERVER}/open`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: window.location.href }),
-    });
-    const data = await res.json();
-    setTooltip("chevren-btn-mpv", res.ok ? "mpv açıldı ✓" : `hata: ${data.message}`);
-    setTimeout(() => setTooltip("chevren-btn-mpv", "mpv'de aç"), 2500);
-  } catch {
-    setTooltip("chevren-btn-mpv", "server'a ulaşılamadı");
-    setTimeout(() => setTooltip("chevren-btn-mpv", "mpv'de aç"), 2500);
+  const stage = status.stage || "idle";
+  currentStage = stage;
+
+  dot.className = ""; // sıfırla
+  bar.style.display = "none";
+  bar.classList.remove("cv-indeterminate");
+  statusText.style.color = "#e0e0e0";
+
+  const showBar = () => {
+    bar.style.display = "block";
+    bar.classList.add("cv-indeterminate");
+  };
+
+  switch (stage) {
+    case "idle":
+      statusText.textContent = "Türkçe altyazı oluştur";
+      subText.textContent = "";
+      dot.classList.add("cv-dot-idle");
+      break;
+    case "downloading":
+      statusText.textContent = "Ses indiriliyor";
+      subText.textContent = "yt-dlp";
+      dot.classList.add("cv-dot-working");
+      showBar();
+      break;
+    case "transcribing":
+      statusText.textContent = "Transkript oluşturuluyor";
+      subText.textContent = "faster-whisper";
+      dot.classList.add("cv-dot-working");
+      showBar();
+      break;
+    case "translating":
+      statusText.textContent = `Çeviri yapılıyor — parça ${status.chunk ?? "…"}`;
+      subText.textContent = "Gemini";
+      dot.classList.add("cv-dot-working");
+      showBar();
+      break;
+    case "ready":
+      statusText.textContent = overlayActive
+        ? "Altyazı gösteriliyor — kapatmak için tıkla"
+        : "Altyazı hazır — göstermek için tıkla";
+      statusText.style.color = "#7dcf7d";
+      subText.textContent = "";
+      dot.classList.add("cv-dot-done");
+      break;
+    case "error":
+      statusText.textContent = `Hata: ${status.message || "bilinmeyen"}`;
+      statusText.style.color = "#e07070";
+      subText.textContent = "tekrar dene";
+      dot.classList.add("cv-dot-error");
+      break;
+    default:
+      statusText.textContent = "Türkçe altyazı oluştur";
+      subText.textContent = "";
+      dot.classList.add("cv-dot-idle");
   }
 }
 
-// ── Overlay altyazı ───────────────────────────────────────────────────────────
+// ── Status polling ───────────────────────────────────────────────────────────
+let pollInterval = null;
 
-let overlayActive = false;
-let overlayEl = null;
-
-async function toggleOverlay() {
-  const id = getVideoId();
-  if (!id) return;
-
-  if (overlayActive) {
-    overlayActive = false;
-    overlayEl?.remove();
-    overlayEl = null;
-    document.getElementById("chevren-btn-overlay").style.opacity = "1";
-    return;
-  }
-
-  setTooltip("chevren-btn-overlay", "kontrol ediliyor...");
-
-  let res = await fetch(`${SERVER}/subtitle/${id}`).catch(() => null);
-
-  if (!res || !res.ok) {
-    setTooltip("chevren-btn-overlay", "altyazı üretiliyor...");
+function startPolling() {
+  if (pollInterval) return;
+  pollInterval = setInterval(async () => {
     try {
-      await fetch(`${SERVER}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: window.location.href }),
-      });
-      res = await fetch(`${SERVER}/subtitle/${id}`).catch(() => null);
-    } catch {
-      setTooltip("chevren-btn-overlay", "server'a ulaşılamadı");
-      setTimeout(() => setTooltip("chevren-btn-overlay", "Türkçe altyazı"), 2500);
-      return;
-    }
-  }
+      const res = await fetch(`${SERVER}/status`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const vid = getVideoId();
+       if (!data.video_id || data.video_id === vid) {
+        if (
+          data.stage === "translating" &&
+          data.chunk === 1 &&
+          currentStage !== "translating" &&
+          !overlayActive
+        ) {
+          const srtRes = await fetch(`${SERVER}/subtitle/${vid}`).catch(() => null);
+          if (srtRes && srtRes.ok) {
+            const srt = await srtRes.text();
+            if (srt.trim()) {
+              overlayActive = true;
+              mountOverlay(parseSrt(srt));
+            }
+          }
+        }
+        updateStrip(data);
+      }
+    } catch {}
+  }, 1000);
+}
 
-  if (!res || !res.ok) {
-    setTooltip("chevren-btn-overlay", "altyazı bulunamadı");
-    setTimeout(() => setTooltip("chevren-btn-overlay", "Türkçe altyazı"), 2500);
+function stopPolling() {
+  clearInterval(pollInterval);
+  pollInterval = null;
+}
+// ── Strip tıklama ────────────────────────────────────────────────────────────
+async function onStripClick() {
+  const vid = getVideoId();
+  if (!vid) return;
+
+  if (currentStage === "ready" || currentStage === "translating" || currentStage === "transcribing") {
+    await toggleOverlay(vid);
+    updateStrip({ stage: currentStage });
     return;
   }
 
-  const srt = await res.text();
-  const cues = parseSrt(srt);
-  overlayActive = true;
-  setTooltip("chevren-btn-overlay", "Türkçe altyazı");
-  document.getElementById("chevren-btn-overlay").style.opacity = "0.6";
-  mountOverlay(cues);
-}
+  if (currentStage === "downloading") return; // ses inmeden SRT yok, tıklamayı yoksay
 
-// ── Yeniden oluştur ───────────────────────────────────────────────────────────
-
-async function regenerateSubtitle() {
-  const id = getVideoId();
-  if (!id) return;
-
-  // Aktif overlay varsa kapat
-  if (overlayActive) {
-    overlayActive = false;
-    overlayEl?.remove();
-    overlayEl = null;
-  }
-
-  setTooltip("chevren-btn-regen", "siliniyor...");
-
+  // Başlat — optimistic UI
+  updateStrip({ stage: "downloading" });
   try {
-    // Cache'i sil
-    await fetch(`${SERVER}/subtitle/${id}`, { method: "DELETE" }).catch(() => null);
-
-    setTooltip("chevren-btn-regen", "üretiliyor...");
-
-    // Yeni altyazı üret
     const res = await fetch(`${SERVER}/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: window.location.href }),
     });
-
-    if (res.ok) {
-      setTooltip("chevren-btn-regen", "hazır ✓");
-    } else {
+    if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      setTooltip("chevren-btn-regen", `hata: ${data.message || res.status}`);
+      updateStrip({ stage: "error", message: data.message || res.status });
     }
   } catch {
-    setTooltip("chevren-btn-regen", "server'a ulaşılamadı");
+    updateStrip({ stage: "error", message: "server'a ulaşılamadı" });
   }
-
-  setTimeout(() => setTooltip("chevren-btn-regen", "Altyazıyı yeniden oluştur"), 3000);
 }
 
-// ── Overlay render ────────────────────────────────────────────────────────────
+// ── mpv ──────────────────────────────────────────────────────────────────────
+async function openInMpv() {
+  const btn = document.getElementById("chevren-btn-mpv");
+  if (btn) btn.style.opacity = "0.5";
+  try {
+    await fetch(`${SERVER}/open`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: window.location.href }),
+    });
+  } catch {}
+  if (btn)
+    setTimeout(() => {
+      btn.style.opacity = "1";
+    }, 2500);
+}
 
-function getOverlayFontSize() {
-  const video = document.querySelector("video");
-  if (!video) return 16;
-  const height = video.getBoundingClientRect().height;
-  return Math.max(14, Math.round(height * 0.045));
+// ── Overlay ──────────────────────────────────────────────────────────────────
+let overlayActive = false;
+let overlayEl = null;
+
+async function toggleOverlay(videoId) {
+  if (overlayActive) {
+    overlayActive = false;
+    overlayEl?.remove();
+    overlayEl = null;
+    return;
+  }
+  const res = await fetch(`${SERVER}/subtitle/${videoId}`).catch(() => null);
+  if (!res || !res.ok) return;
+  const srt = await res.text();
+  overlayActive = true;
+  mountOverlay(parseSrt(srt));
 }
 
 function mountOverlay(cues) {
@@ -238,126 +314,125 @@ function mountOverlay(cues) {
 
   overlayEl = document.createElement("div");
   overlayEl.id = "chevren-overlay";
-  overlayEl.style.cssText = `
-    position: absolute;
-    bottom: 60px;
-    left: 0; right: 0;
-    text-align: center;
-    pointer-events: none;
-    z-index: 9999;
-  `;
+  overlayEl.style.cssText =
+    "position:absolute;bottom:60px;left:0;right:0;text-align:center;pointer-events:none;z-index:9999;";
 
   const text = document.createElement("span");
   text.id = "chevren-overlay-text";
-  text.style.cssText = `
-    background: rgba(0,0,0,0.75);
-    color: #fff;
-    padding: 5px 16px;
-    border-radius: 4px;
-    display: inline-block;
-    font-size: ${getOverlayFontSize()}px;
-  `;
+  text.style.cssText = `background:rgba(0,0,0,0.78);color:#fff;padding:5px 16px;border-radius:4px;display:inline-block;font-size:${getOverlayFontSize()}px;font-family:sans-serif;`;
   overlayEl.appendChild(text);
 
-  const playerContainer = document.querySelector("#movie_player") ||
-                         video.closest("ytd-player") ||
-                         video.closest("[id='movie_player']");
-
-  if (playerContainer) {
-    playerContainer.style.position = "relative";
-    playerContainer.appendChild(overlayEl);
+  const container =
+    document.querySelector("#movie_player") ||
+    video.closest("[id='movie_player']");
+  if (container) {
+    container.style.position = "relative";
+    container.appendChild(overlayEl);
   } else {
+    Object.assign(overlayEl.style, {
+      position: "fixed",
+      bottom: "80px",
+      zIndex: "99999",
+    });
     document.body.appendChild(overlayEl);
-    overlayEl.style.position = "fixed";
-    overlayEl.style.bottom = "80px";
-    overlayEl.style.left = "0";
-    overlayEl.style.right = "0";
-    overlayEl.style.zIndex = "99999";
   }
 
-  const resizeObserver = new ResizeObserver(() => {
+  new ResizeObserver(() => {
     text.style.fontSize = getOverlayFontSize() + "px";
-  });
-  resizeObserver.observe(video);
-
+  }).observe(video);
   video.addEventListener("timeupdate", () => {
     if (!overlayActive) return;
     const t = video.currentTime;
-    const cue = cues.find(c => t >= c.start && t <= c.end);
+    const cue = cues.find((c) => t >= c.start && t <= c.end);
     text.textContent = cue ? cue.text : "";
   });
 }
 
-// ── SRT parser ────────────────────────────────────────────────────────────────
-
-function parseSrt(srt) {
-  const blocks = srt.trim().split(/\n\n+/);
-  return blocks.flatMap(block => {
-    const lines = block.trim().split("\n");
-    const timeLine = lines.find(l => l.includes("-->"));
-    if (!timeLine) return [];
-    const [startStr, endStr] = timeLine.split("-->").map(s => s.trim());
-    return [{
-      start: srtTimeToSeconds(startStr),
-      end: srtTimeToSeconds(endStr),
-      text: lines.slice(lines.indexOf(timeLine) + 1).join(" "),
-    }];
-  });
+function getOverlayFontSize() {
+  const v = document.querySelector("video");
+  return v
+    ? Math.max(14, Math.round(v.getBoundingClientRect().height * 0.045))
+    : 16;
 }
 
-function srtTimeToSeconds(t) {
+// ── SRT parser ───────────────────────────────────────────────────────────────
+function parseSrt(srt) {
+  return srt
+    .trim()
+    .split(/\n\n+/)
+    .flatMap((block) => {
+      const lines = block.trim().split("\n");
+      const timeLine = lines.find((l) => l.includes("-->"));
+      if (!timeLine) return [];
+      const [s, e] = timeLine.split("-->").map((x) => x.trim());
+      return [
+        {
+          start: srtToSec(s),
+          end: srtToSec(e),
+          text: lines.slice(lines.indexOf(timeLine) + 1).join(" "),
+        },
+      ];
+    });
+}
+function srtToSec(t) {
   const [h, m, s] = t.replace(",", ".").split(":");
   return parseFloat(h) * 3600 + parseFloat(m) * 60 + parseFloat(s);
 }
 
-// ── Yardımcı ─────────────────────────────────────────────────────────────────
+// ── Injection ────────────────────────────────────────────────────────────────
+let domObserver = null;
 
-function setTooltip(id, msg) {
-  const el = document.getElementById(id);
-  if (el) el.setAttribute("data-chevren-tip", msg);
+function tryInjectAll() {
+  injectMpvButton();
+  injectStrip();
 }
 
-// ── Injection — .ytp-right-controls hazır olunca inject et ───────────────────
-
-let controlsObserver = null;
-
-function waitForControls() {
-  // Zaten inject edilmişse dur
-  if (document.getElementById("chevren-btn-mpv")) return;
-
-  // Element hazırsa hemen inject et
-  if (document.querySelector(".ytp-right-controls")) {
-    injectButtons();
+function waitForElements() {
+  tryInjectAll();
+  if (
+    document.getElementById("chevren-btn-mpv") &&
+    document.getElementById("chevren-strip")
+  )
     return;
-  }
-
-  // DOM değişikliklerini izle, .ytp-right-controls çıkınca inject et
-  if (controlsObserver) controlsObserver.disconnect();
-  controlsObserver = new MutationObserver(() => {
-    if (document.querySelector(".ytp-right-controls")) {
-      controlsObserver.disconnect();
-      injectButtons();
+  if (domObserver) domObserver.disconnect();
+  domObserver = new MutationObserver(() => {
+    injectMpvButton();
+    injectStrip();
+    if (
+      document.getElementById("chevren-btn-mpv") &&
+      document.getElementById("chevren-strip")
+    ) {
+      domObserver.disconnect();
     }
   });
-  controlsObserver.observe(document.body, { childList: true, subtree: true });
+  domObserver.observe(document.body, { childList: true, subtree: true });
 }
 
-// ── URL takibi ────────────────────────────────────────────────────────────────
+// ── URL takibi ───────────────────────────────────────────────────────────────
 let lastUrl = location.href;
 setInterval(() => {
-  if (location.href !== lastUrl) {
-    lastUrl = location.href;
-    // Overlay temizle (yeni video)
-    if (overlayActive) {
-      overlayActive = false;
-      overlayEl?.remove();
-      overlayEl = null;
-    }
-    // Butonları temizle (yeni video)
-    ["chevren-btn-mpv", "chevren-btn-overlay", "chevren-btn-regen"]
-      .forEach(id => document.getElementById(id)?.remove());
-    if (getVideoId()) waitForControls();
+  if (location.href === lastUrl) return;
+  lastUrl = location.href;
+
+  if (overlayActive) {
+    overlayActive = false;
+    overlayEl?.remove();
+    overlayEl = null;
+  }
+  document.getElementById("chevren-btn-mpv")?.remove();
+  document.getElementById("chevren-strip")?.remove();
+  currentStage = "idle";
+
+  if (getVideoId()) {
+    waitForElements();
+    startPolling();
+  } else {
+    stopPolling();
   }
 }, 500);
 
-if (getVideoId()) waitForControls();
+// ── Başlat ───────────────────────────────────────────────────────────────────
+if (getVideoId()) {
+  waitForElements();
+  startPolling();
+}
