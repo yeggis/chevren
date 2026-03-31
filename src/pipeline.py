@@ -4,7 +4,6 @@ YouTube URL veya yerel dosya → Türkçe SRT
 """
 
 import gc
-import socket
 import subprocess
 import sys
 import time
@@ -13,11 +12,17 @@ from pathlib import Path
 APP_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(APP_DIR))
 
+import json as _json
+
 import cache
 import config
 
 CHUNK_SIZE = 150
 STREAM_CHUNK = 30  # streaming modunda kaç segment birikince çeviri başlasın
+
+
+def _status(**kw):
+    print(f"CHEVREN_STATUS:{_json.dumps(kw)}", flush=True)
 
 
 def _fmt_ts(seconds: float) -> str:
@@ -78,6 +83,7 @@ def _detect_cookie_browser():
         if best:
             return ("browser", f"firefox:{best}")
     import shutil
+
     for b in ["firefox", "librewolf"]:
         if shutil.which(b):
             return ("browser", b)
@@ -85,7 +91,14 @@ def _detect_cookie_browser():
 
 
 def _yt_dlp_args(source: str, output: str) -> list:
-    base = ["yt-dlp", "-f", "140", source, "-o", output]
+    base = [
+        "yt-dlp",
+        "-f",
+        "140/m4a/bestaudio[ext=m4a]/bestaudio",
+        source,
+        "-o",
+        output,
+    ]
     kind, value = _detect_cookie_browser()
     if kind == "file":
         return base + ["--cookies", value]
@@ -311,7 +324,6 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
     """
     Streaming mod — Whisper segment ürettikçe Gemini'ye gönderir,
     SRT dosyasına anında yazar.
-
     on_ready: SRT dosyası ilk kez hazır olunca çağrılır (mpv'yi açmak için)
               Signature: on_ready(srt_path: Path)
     """
@@ -329,17 +341,16 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
     print(f"İşleniyor: {source}")
     workdir.mkdir(parents=True, exist_ok=True)
 
-    # Ses indir
+    _status(stage="downloading", video_id=video_id)
     wav = _extract_audio(source, workdir)
 
-    # Gemini client hazırla
     api_key = config.get("gemini_api_key")
     if not api_key:
         raise ValueError("Gemini API key eksik. 'chevren setup' ile ekleyin.")
     client = genai.Client(api_key=api_key)
     model_name = config.get("gemini_model")
 
-    # Whisper modelini yükle
+    _status(stage="transcribing", video_id=video_id)
     model = WhisperModel(
         config.get("whisper_model"),
         device=config.get("whisper_device"),
@@ -349,18 +360,17 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
         str(wav), language="en", beam_size=5, vad_filter=True
     )
 
-    # SRT dosyasını hazırla (boş)
     srt_path = cache.path(video_id)
     srt_path.parent.mkdir(parents=True, exist_ok=True)
     srt_path.write_text("", encoding="utf-8")
 
-    pending = []  # henüz çevrilmemiş İngilizce bloklar
-    seg_count = 0  # toplam segment sayısı
-    blk_count = 0  # SRT'ye yazılan toplam blok sayısı
-    chunk_num = 0  # çeviri chunk sayacı
+    pending = []
+    seg_count = 0
+    blk_count = 0
+    chunk_num = 0
     ready_sent = False
-
     exhausted_models = set()
+
     for seg in segments:
         seg_count += 1
         pending.append(
@@ -370,11 +380,10 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
                 "text": seg.text.strip(),
             }
         )
-
-        # STREAM_CHUNK kadar segment birikince çevir ve yaz
         if len(pending) >= STREAM_CHUNK:
             chunk_num += 1
             print(f"  Çeviri: chunk {chunk_num} ({seg_count} segment işlendi)")
+            _status(stage="translating", chunk=chunk_num, video_id=video_id)
             translated = _translate_chunk(
                 client, model_name, pending, chunk_num, exhausted_models
             )
@@ -383,31 +392,29 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
             _reload_mpv_subs(srt_path)
             blk_count += len(translated)
             pending.clear()
-
-            # İlk chunk hazır olunca mpv'yi başlat
             if not ready_sent and on_ready:
                 on_ready(srt_path)
                 ready_sent = True
 
-    # Kalan segmentleri çevir
     if pending:
         chunk_num += 1
         print(f"  Çeviri: chunk {chunk_num} (son)")
+        _status(stage="translating", chunk=chunk_num, video_id=video_id)
         translated = _translate_chunk(
             client, model_name, pending, chunk_num, exhausted_models
         )
         translated = _renumber(translated, blk_count + 1)
         _append_srt(srt_path, translated)
         _reload_mpv_subs(srt_path)
+
     del model
     gc.collect()
 
-    # Cache'e kaydet
     cache.write(video_id, srt_path.read_text(encoding="utf-8"))
 
-    # Eğer on_ready hiç çağrılmadıysa (çok kısa video) şimdi çağır
     if not ready_sent and on_ready:
         on_ready(srt_path)
 
+    _status(stage="ready", video_id=video_id)
     print(f"Tamamlandı → {srt_path}")
     return srt_path
