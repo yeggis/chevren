@@ -135,11 +135,11 @@ def _extract_audio(source: str, workdir: Path) -> Path:
 
 
 GEMINI_FALLBACK_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-3-flash",
+    "gemini-2.5-flash",        # 1. primary (en iyi kalite, 20 RPD)
+    "gemini-2.5-flash-lite",   # 2. hafif versiyon, aynı nesil (20 RPD)
+    "gemini-3.1-flash-lite",   # 3. en yüksek kota (500 RPD) — kota kurtarıcı
+    "gemini-3-flash",          # 4. son çare (20 RPD, daha eski)
 ]
-
 
 class _KeyPool:
     """Çoklu API key + model rotasyonu. Kota dolunca sıradaki key/model'e geçer."""

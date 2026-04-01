@@ -77,15 +77,72 @@ def cmd_setup():
 
     import getpass
 
-    existing = "●●●●●●●●" if cfg.get("gemini_api_key") else "boş"
-    key = getpass.getpass(f"Gemini API key [{existing}]: ").strip()
-    if key:
-        cfg["gemini_api_key"] = key
+    # --- Gemini API Keys ---
+    print("\n── Gemini API Key'leri ──────────────────────────")
+    keys = config.get_api_keys()
+    if keys:
+        for i, k in enumerate(keys):
+            masked = k[:8] + "●" * (len(k) - 8) if len(k) > 8 else "●●●●●●●●"
+            print(f"  {i + 1}. {masked}")
+    else:
+        print("  (henüz key yok)")
+
+    print()
+    print("  a) Yeni key ekle")
+    if keys:
+        print("  d) Key sil")
+    print("  Enter) Değiştirme")
+    secim = input("\nSeçim: ").strip().lower()
+
+    if secim == "a":
+        yeni = getpass.getpass("  Yeni Gemini API key: ").strip()
+        if yeni:
+            keys.append(yeni)
+            cfg["gemini_api_keys"] = keys
+            cfg["gemini_api_key"] = keys[0]
+            print(f"  ✓ Key eklendi ({len(keys)} key toplam)")
+    elif secim == "d" and keys:
+        sil = input(f"  Hangi key silinsin? [1-{len(keys)}]: ").strip()
+        try:
+            idx = int(sil) - 1
+            if 0 <= idx < len(keys):
+                keys.pop(idx)
+                cfg["gemini_api_keys"] = keys
+                cfg["gemini_api_key"] = keys[0] if keys else ""
+                print("  ✓ Key silindi")
+        except ValueError:
+            print("  Geçersiz seçim, değiştirilmedi.")
 
     detected = config.detect_hardware()["whisper_model"]
     current = cfg.get("whisper_model", detected)
     model = input(f"Whisper modeli [{detected} önerilen, şu an: {current}]: ").strip()
     cfg["whisper_model"] = model if model else detected
+
+    # --- Gemini Model Sırası ---
+    print("\n── Gemini Model Sırası ──────────────────────────")
+    from pipeline import GEMINI_FALLBACK_MODELS
+    current_primary = cfg.get("gemini_model", GEMINI_FALLBACK_MODELS[0])
+    all_models = [current_primary] + [m for m in GEMINI_FALLBACK_MODELS if m != current_primary]
+    for i, m in enumerate(all_models):
+        star = "★" if i == 0 else " "
+        print(f"  {star} {i + 1}. {m}")
+    print()
+    print("  Kullanılabilir ek modeller:")
+    extras = [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-3-flash",
+        "gemini-3.1-flash-lite",
+    ]
+    for e in extras:
+        if e not in all_models:
+            print(f"      • {e}")
+    print()
+    yeni_model = input(f"  Ana model [{current_primary}]: ").strip()
+    if yeni_model:
+        cfg["gemini_model"] = yeni_model
+    print("  (Fallback sırası otomatik: flash → flash-lite → 3-flash → 3.1-flash-lite)")
+
     player = input(f"Oynatıcı [{cfg.get('player', 'mpv')}]: ").strip()
     if player:
         cfg["player"] = player
