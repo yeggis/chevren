@@ -25,16 +25,28 @@ pub struct OpenResponse {
 
 // ── /open — mpv modu (değişmedi) ────────────────────────────────────────────
 pub async fn handler(
-    State(_state): State<SharedState>,
+    State(state): State<SharedState>,
     Json(req): Json<OpenRequest>,
 ) -> Result<Json<OpenResponse>, (StatusCode, Json<OpenResponse>)> {
     let video_id =
         extract_video_id(&req.url).ok_or_else(|| error_response("Geçersiz YouTube URL'si"))?;
     let srt_path = cache_path(&video_id);
     if !srt_path.exists() {
-        run_pipeline_blocking(&req.url, &srt_path)
-            .await
-            .map_err(|e| error_response(&format!("Pipeline hatası: {e}")))?;
+        // generate_handler zaten çalışıyorsa, bitmesini bekle
+        loop {
+            let busy = {
+                let s = state.lock().unwrap();
+                matches!(s.stage.as_str(), "downloading" | "transcribing" | "translating")
+            };
+            if !busy { break; }
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        }
+        // Bekleme sonrası hâlâ yoksa kendi pipeline'ını çalıştır
+        if !srt_path.exists() {
+            run_pipeline_blocking(&req.url, &srt_path)
+                .await
+                .map_err(|e| error_response(&format!("Pipeline hatası: {e}")))?;
+        }
     }
     mpv::open_with_subtitle(&req.url, &srt_path)
         .await

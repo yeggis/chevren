@@ -246,6 +246,11 @@ def _translate_chunk(
                     return blocks
                 attempt = 0
                 continue
+            if "503" in err or "UNAVAILABLE" in err:
+                wait = 10 * (attempt + 1)
+                print(f"  Chunk {chunk_index}: [{pool.label(model)}] servis meşgul, {wait}s bekleniyor...")
+                time.sleep(wait)
+                continue
             attempt += 1
             if attempt >= 3:
                 print(f"  Chunk {chunk_index}: [{pool.label(model)}] 3 denemede başarısız → model değiştir")
