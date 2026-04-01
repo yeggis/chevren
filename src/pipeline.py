@@ -135,54 +135,64 @@ def _extract_audio(source: str, workdir: Path) -> Path:
 
 
 GEMINI_FALLBACK_MODELS = [
-    "gemini-2.5-flash",        # 1. primary (en iyi kalite, 20 RPD)
-    "gemini-2.5-flash-lite",   # 2. hafif versiyon, aynı nesil (20 RPD)
-    "gemini-3.1-flash-lite",   # 3. en yüksek kota (500 RPD) — kota kurtarıcı
-    "gemini-3-flash",          # 4. son çare (20 RPD, daha eski)
+    "gemini-2.5-flash",              # 1. primary (en iyi kalite, 20 RPD)
+    "gemini-2.5-flash-lite",         # 2. hafif versiyon, aynı nesil (20 RPD)
+    "gemini-3.1-flash-lite-preview", # 3. en yüksek kota (500 RPD) — kota kurtarıcı
+    "gemini-3-flash-preview",        # 4. son çare (20 RPD)
 ]
 
 class _KeyPool:
-    """Çoklu API key + model rotasyonu. Kota dolunca sıradaki key/model'e geçer."""
-
+    """Çoklu API key + model rotasyonu.
+    Kota dolunca önce diğer key'lere geçer (aynı model),
+    tüm key'ler tükenince bir sonraki modele düşer."""
     def __init__(self, keys: list[str], base_model: str):
         from google import genai
-
         if not keys:
             raise ValueError("Gemini API key eksik. 'chevren setup' ile ekleyin.")
         self.base_model = base_model
         self._clients = [genai.Client(api_key=k) for k in keys]
-        self._exhausted: dict[int, set] = {i: set() for i in range(len(keys))}
-        self._idx = 0
-
-    @property
-    def client(self):
-        return self._clients[self._idx]
-
-    def _available(self, idx: int) -> list[str]:
-        all_m = [self.base_model] + [
-            m for m in GEMINI_FALLBACK_MODELS if m != self.base_model
-        ]
-        return [m for m in all_m if m not in self._exhausted[idx]]
-
+        self._n = len(keys)
+        self._exhausted: dict[str, set[int]] = {}
+        self._key_idx = 0
+    def _model_list(self) -> list[str]:
+        seen, result = set(), []
+        for m in [self.base_model] + GEMINI_FALLBACK_MODELS:
+            if m not in seen:
+                seen.add(m)
+                result.append(m)
+        return result
+    def _keys_for(self, model: str) -> list[int]:
+        ex = self._exhausted.get(model, set())
+        return [i for i in range(self._n) if i not in ex]
     @property
     def current_model(self) -> str | None:
-        m = self._available(self._idx)
-        return m[0] if m else None
-
-    def exhaust_model(self, model: str) -> None:
-        self._exhausted[self._idx].add(model)
-
-    def advance(self) -> bool:
-        """Sonraki kullanılabilir key'e geç. False → hepsi tükendi."""
-        for i in range(self._idx + 1, len(self._clients)):
-            if self._available(i):
-                print(f"  API key rotasyonu: key[{self._idx}] → key[{i}]")
-                self._idx = i
+        for m in self._model_list():
+            if self._keys_for(m):
+                return m
+        return None
+    @property
+    def client(self):
+        return self._clients[self._key_idx]
+    def label(self, model: str) -> str:
+        return f"key[{self._key_idx}]/{model}"
+    def exhaust_current_key(self, model: str) -> bool:
+        """Aktif key'i bu model için tüket.
+        Aynı modelde başka key varsa ona geç → True.
+        Yoksa bir sonraki modele düş → True.
+        Hiçbir şey kalmadıysa → False."""
+        self._exhausted.setdefault(model, set()).add(self._key_idx)
+        remaining = self._keys_for(model)
+        if remaining:
+            self._key_idx = remaining[0]
+            print(f"  key rotasyonu → key[{self._key_idx}] (model: {model})")
+            return True
+        for m in self._model_list():
+            avail = self._keys_for(m)
+            if avail:
+                self._key_idx = avail[0]
+                print(f"  model rotasyonu: {model} → {m} key[{self._key_idx}]")
                 return True
         return False
-
-    def label(self, model: str) -> str:
-        return f"key[{self._idx}]/{model}"
 
 
 def _translate_chunk(
@@ -205,14 +215,8 @@ def _translate_chunk(
     while True:
         model = pool.current_model
         if model is None:
-            if not pool.advance():
-                print(
-                    f"  Chunk {chunk_index}: tüm key ve modeller tükendi, İngilizce bırakıldı."
-                )
-                return blocks
-            attempt = 0
-            continue
-
+            print(f"  Chunk {chunk_index}: tüm key ve modeller tükendi, İngilizce bırakıldı.")
+            return blocks
         print(f"  Chunk {chunk_index}: [{pool.label(model)}] deneniyor...")
         try:
             tr_text = pool.client.models.generate_content(
@@ -236,23 +240,20 @@ def _translate_chunk(
         except Exception as e:
             err = str(e)
             if "429" in err or "RESOURCE_EXHAUSTED" in err:
-                print(
-                    f"  Chunk {chunk_index}: [{pool.label(model)}] kota doldu → rotasyon"
-                )
-                pool.exhaust_model(model)
+                print(f"  Chunk {chunk_index}: [{pool.label(model)}] kota doldu → rotasyon")
+                if not pool.exhaust_current_key(model):
+                    print(f"  Chunk {chunk_index}: tüm key ve modeller tükendi, İngilizce bırakıldı.")
+                    return blocks
                 attempt = 0
-                # model yoksa advance() while başında tetiklenir
                 continue
-
             attempt += 1
             if attempt >= 3:
-                print(
-                    f"  Chunk {chunk_index}: [{pool.label(model)}] 3 denemede başarısız → model değiştir"
-                )
-                pool.exhaust_model(model)
+                print(f"  Chunk {chunk_index}: [{pool.label(model)}] 3 denemede başarısız → model değiştir")
+                if not pool.exhaust_current_key(model):
+                    print(f"  Chunk {chunk_index}: tüm key ve modeller tükendi, İngilizce bırakıldı.")
+                    return blocks
                 attempt = 0
                 continue
-
             match = re.search(r"retryDelay.*?(\d+)s", err)
             wait = int(match.group(1)) + 2 if match else 5 * attempt
             print(f"  Chunk {chunk_index}: hata (deneme {attempt}/3): {e}")
@@ -355,7 +356,6 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
     on_ready: SRT dosyası ilk kez hazır olunca çağrılır (mpv'yi açmak için)
               Signature: on_ready(srt_path: Path)
     """
-    from faster_whisper import WhisperModel
     video_id = _extract_video_id(source)
     try:
         return _run_streaming_inner(source, workdir, video_id, on_ready)
@@ -374,6 +374,7 @@ def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=Non
         srt_path = cache.path(video_id)
         if on_ready:
             on_ready(srt_path)
+        _status(stage="ready", video_id=video_id)
         return srt_path
     print(f"İşleniyor: {source}", flush=True)
     workdir.mkdir(parents=True, exist_ok=True)
@@ -439,10 +440,6 @@ def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=Non
     cache.write(video_id, srt_path.read_text(encoding="utf-8"))
     if not ready_sent and on_ready:
         on_ready(srt_path)
-    _status(stage="ready", video_id=video_id)
-    print(f"Tamamlandı → {srt_path}")
-    return srt_path
-
     _status(stage="ready", video_id=video_id)
     print(f"Tamamlandı → {srt_path}")
     return srt_path
