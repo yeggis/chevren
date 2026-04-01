@@ -75,6 +75,23 @@ function injectStyles() {
     .cv-dot-working { background: #c8a84b; animation: cv-pulse 1.4s ease-in-out infinite; }
     .cv-dot-done    { background: #5cb85c; }
     .cv-dot-error   { background: #e05c5c; }
+    #chevren-delete-btn {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.3);
+      font-size: 15px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 2px;
+      flex-shrink: 0;
+      display: none;
+      transition: color 0.2s;
+      font-family: sans-serif;
+    }
+    #chevren-delete-btn:hover {
+      color: #e05c5c;
+    }
+
     @keyframes cv-pulse {
       0%,100% { opacity:1; transform:scale(1); }
       50%     { opacity:0.3; transform:scale(0.6); }
@@ -128,6 +145,7 @@ function injectStrip() {
       <span id="chevren-badge">CV</span>
       <span id="chevren-status-text">Türkçe altyazı oluştur</span>
       <span id="chevren-sub-text"></span>
+      <button id="chevren-delete-btn" title="Altyazıyı sil">×</button>
       <div id="chevren-dot" class="cv-dot-idle"></div>
       <div id="chevren-progress-bar" style="display:none;width:0;"></div>
     </div>
@@ -136,6 +154,23 @@ function injectStrip() {
   document
     .getElementById("chevren-strip-main")
     .addEventListener("click", onStripClick);
+  document
+    .getElementById("chevren-delete-btn")
+    .addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const vid = getVideoId();
+      if (!vid) return;
+      await fetch(`${SERVER}/subtitle/${vid}`, { method: "DELETE" }).catch(
+        () => {},
+      );
+      if (overlayActive) {
+        overlayActive = false;
+        overlayEl?.remove();
+        overlayEl = null;
+      }
+      currentStage = "idle";
+      updateStrip({ stage: "idle" });
+    });
 }
 
 // ── Strip state update ───────────────────────────────────────────────────────
@@ -146,6 +181,7 @@ function updateStrip(status) {
   const subText = document.getElementById("chevren-sub-text");
   const dot = document.getElementById("chevren-dot");
   const bar = document.getElementById("chevren-progress-bar");
+  const deleteBtn = document.getElementById("chevren-delete-btn");
   if (!statusText) return;
 
   const stage = status.stage || "idle";
@@ -155,6 +191,7 @@ function updateStrip(status) {
   bar.style.display = "none";
   bar.classList.remove("cv-indeterminate");
   statusText.style.color = "#e0e0e0";
+  if (deleteBtn) deleteBtn.style.display = "none";
 
   const showBar = () => {
     bar.style.display = "block";
@@ -192,6 +229,7 @@ function updateStrip(status) {
       statusText.style.color = "#7dcf7d";
       subText.textContent = "";
       dot.classList.add("cv-dot-done");
+      if (deleteBtn) deleteBtn.style.display = "inline-flex";
       break;
     case "error":
       statusText.textContent = `Hata: ${status.message || "bilinmeyen"}`;
@@ -213,20 +251,37 @@ function startPolling() {
   if (pollInterval) return;
   pollInterval = setInterval(async () => {
     try {
-      const res = await fetch(`${SERVER}/status`);
+      const vid = getVideoId();
+      if (!vid) return;
+      const res = await fetch(`${SERVER}/status?v=${vid}`);
       if (!res.ok) return;
       const data = await res.json();
-      const vid = getVideoId();
-       if (!data.video_id || data.video_id === vid) {
-      const shouldAutoOpen =
+      if (!data.video_id || data.video_id === vid) {
+        const shouldAutoOpen =
           !overlayActive &&
-          (data.stage === "translating" || data.stage === "ready") &&
-          data.chunk_max >= 1;
-        if (shouldAutoOpen) {          const srtRes = await fetch(`${SERVER}/subtitle/${vid}`).catch(() => null);
+          !userClosedOverlay &&
+          (data.stage === "ready" ||
+            (data.stage === "translating" && (data.chunk_max ?? 0) >= 1));
+        if (shouldAutoOpen) {
+          const srtRes = await fetch(`${SERVER}/subtitle/${vid}`).catch(
+            () => null,
+          );
           if (srtRes && srtRes.ok) {
             const srt = await srtRes.text();
             if (srt.trim()) {
               overlayActive = true;
+              mountOverlay(parseSrt(srt));
+            }
+          }
+        }
+        // translating'de overlay açıksa SRT'yi güncelle
+        if (overlayActive && data.stage === "translating") {
+          const srtRes = await fetch(`${SERVER}/subtitle/${vid}`).catch(() => null);
+          if (srtRes && srtRes.ok) {
+            const srt = await srtRes.text();
+            if (srt.trim()) {
+              overlayEl?.remove();
+              overlayEl = null;
               mountOverlay(parseSrt(srt));
             }
           }
@@ -246,7 +301,11 @@ async function onStripClick() {
   const vid = getVideoId();
   if (!vid) return;
 
-  if (currentStage === "ready" || currentStage === "translating" || currentStage === "transcribing") {
+  if (
+    currentStage === "ready" ||
+    currentStage === "translating" ||
+    currentStage === "transcribing"
+  ) {
     await toggleOverlay(vid);
     updateStrip({ stage: currentStage });
     return;
@@ -291,14 +350,17 @@ async function openInMpv() {
 // ── Overlay ──────────────────────────────────────────────────────────────────
 let overlayActive = false;
 let overlayEl = null;
+let userClosedOverlay = false;
 
 async function toggleOverlay(videoId) {
   if (overlayActive) {
     overlayActive = false;
     overlayEl?.remove();
     overlayEl = null;
+    userClosedOverlay = true;
     return;
   }
+  userClosedOverlay = false;
   const res = await fetch(`${SERVER}/subtitle/${videoId}`).catch(() => null);
   if (!res || !res.ok) return;
   const srt = await res.text();
@@ -338,12 +400,14 @@ function mountOverlay(cues) {
   new ResizeObserver(() => {
     text.style.fontSize = getOverlayFontSize() + "px";
   }).observe(video);
-  video.addEventListener("timeupdate", () => {
+  const updateCue = () => {
     if (!overlayActive) return;
     const t = video.currentTime;
     const cue = cues.find((c) => t >= c.start && t <= c.end);
     text.textContent = cue ? cue.text : "";
-  });
+  };
+  video.addEventListener("timeupdate", updateCue);
+  updateCue();
 }
 
 function getOverlayFontSize() {
@@ -417,6 +481,7 @@ setInterval(() => {
     overlayEl?.remove();
     overlayEl = null;
   }
+  userClosedOverlay = false;
   document.getElementById("chevren-btn-mpv")?.remove();
   document.getElementById("chevren-strip")?.remove();
   currentStage = "idle";
