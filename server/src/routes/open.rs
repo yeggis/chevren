@@ -101,7 +101,7 @@ async fn run_pipeline_tracked(url: String, state: SharedState) {
     let child = Command::new("chevren")
         .args(["--no-play", &url])
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn();
 
     let mut child = match child {
@@ -113,6 +113,31 @@ async fn run_pipeline_tracked(url: String, state: SharedState) {
             return;
         }
     };
+
+    let mut last_stderr = String::new();
+
+    if let Some(stderr) = child.stderr.take() {
+        let state2 = state.clone();
+        tokio::spawn(async move {
+            let mut lines = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                // CHEVREN_STATUS satırlarını stderr'dan da yakala
+                if let Some(json_str) = line.strip_prefix("CHEVREN_STATUS:") {
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
+                        let mut s = state2.lock().unwrap();
+                        if let Some(stage) = val["stage"].as_str() {
+                            s.stage = stage.to_string();
+                        }
+                        if let Some(msg) = val.get("message").and_then(|v| v.as_str()) {
+                            s.message = Some(msg.to_string());
+                        }
+                    }
+                } else {
+                    tracing::debug!("pipeline stderr: {}", line);
+                }
+            }
+        });
+    }
 
     if let Some(stdout) = child.stdout.take() {
         let mut lines = BufReader::new(stdout).lines();
@@ -136,6 +161,9 @@ async fn run_pipeline_tracked(url: String, state: SharedState) {
                         .and_then(|v| v.as_str())
                         .map(String::from);
                 }
+            } else {
+                last_stderr = line.clone();
+                tracing::info!("pipeline: {}", line);
             }
         }
     }
@@ -151,12 +179,17 @@ async fn run_pipeline_tracked(url: String, state: SharedState) {
             let mut s = state.lock().unwrap();
             if s.stage != "ready" {
                 s.stage = "error".into();
-                s.message = Some("Pipeline başarısız oldu".into());
+                if s.message.is_none() || s.message.as_deref() == Some("Pipeline başarısız oldu") {
+                    s.message = Some(if last_stderr.is_empty() {
+                        "Pipeline başarısız oldu".into()
+                    } else {
+                        last_stderr.clone()
+                    });
+                }
             }
         }
     }
 }
-
 // ── Blocking pipeline — mpv modu için ────────────────────────────────────────
 async fn run_pipeline_blocking(url: &str, srt_path: &PathBuf) -> anyhow::Result<()> {
     if let Some(parent) = srt_path.parent() {
