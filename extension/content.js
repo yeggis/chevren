@@ -274,8 +274,11 @@ function startPolling() {
             }
           }
         }
-        // translating'de overlay açıksa SRT'yi güncelle
-        if (overlayActive && data.stage === "translating") {
+        // overlay açıksa SRT güncelle: chunk değişince (translating) veya ready'ye geçince
+        const isReady = data.stage === "ready";
+        const chunkChanged = data.stage === "translating" && (data.chunk ?? 0) !== lastOverlayChunk;
+        if (overlayActive && (isReady || chunkChanged)) {
+          lastOverlayChunk = data.chunk ?? 0;
           const srtRes = await fetch(`${SERVER}/subtitle/${vid}`).catch(() => null);
           if (srtRes && srtRes.ok) {
             const srt = await srtRes.text();
@@ -286,6 +289,7 @@ function startPolling() {
             }
           }
         }
+        if (isReady) lastOverlayChunk = 0; // sıfırla, bir sonraki video için
         updateStrip(data);
       }
     } catch {}
@@ -351,6 +355,7 @@ async function openInMpv() {
 let overlayActive = false;
 let overlayEl = null;
 let userClosedOverlay = false;
+let lastOverlayChunk = 0;
 
 async function toggleOverlay(videoId) {
   if (overlayActive) {
@@ -482,6 +487,7 @@ setInterval(() => {
     overlayEl = null;
   }
   userClosedOverlay = false;
+  lastOverlayChunk = 0;
   document.getElementById("chevren-btn-mpv")?.remove();
   document.getElementById("chevren-strip")?.remove();
   currentStage = "idle";
