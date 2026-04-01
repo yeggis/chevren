@@ -1,0 +1,4 @@
+faster-whisper==1.2.1
+google-genai==1.70.0
+urllib3==2.6.3
+charset-normalizer==3.4.6
