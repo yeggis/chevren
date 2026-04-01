@@ -5,6 +5,7 @@ PKGREL  := $(shell grep '^pkgrel' PKGBUILD | cut -d= -f2)
 
 aur-update:
 	git pull
+	updpkgsums
 	makepkg --printsrcinfo > .SRCINFO
 	cp PKGBUILD .SRCINFO ../chevren-aur/
 	cd ../chevren-aur && \
