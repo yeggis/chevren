@@ -185,7 +185,10 @@ def cmd_setup():
         continue_idx = len(key_items) - 1
         secim = _pick("Gemini API Key'leri", key_items, current_idx=continue_idx)
 
-        if secim is None or secim == continue_idx:
+        if secim is None:
+            print("\nKurulum iptal edildi.")
+            return
+        if secim == continue_idx:
             break
         elif secim == continue_idx - (1 if keys else 0) - (1 if keys else 0):
             # "+ Yeni key ekle" satırı
@@ -240,7 +243,8 @@ def cmd_setup():
     sec = _pick("Whisper Modeli", whisper_items, current_idx=cur_idx,
                 extra_prompt="Manuel gir")
     if sec is None:
-        pass  # değiştirme
+        print("\nKurulum iptal edildi.")
+        return
     elif sec == "extra":
         manuel = pt_prompt("  Model adı: ").strip()
         if manuel:
@@ -261,7 +265,8 @@ def cmd_setup():
     gsec = _pick("Gemini Ana Model", gemini_items, current_idx=0,
                  extra_prompt="Manuel gir")
     if gsec is None:
-        pass
+        print("\nKurulum iptal edildi.")
+        return
     elif gsec == "extra":
         manuel = pt_prompt("  Model adı: ").strip()
         if manuel:
@@ -286,7 +291,8 @@ def cmd_setup():
     psec = _pick("Oynatıcı", player_items, current_idx=cur_player_idx,
                  extra_prompt="Manuel gir")
     if psec is None:
-        pass
+        print("\nKurulum iptal edildi.")
+        return
     elif psec == "extra":
         manuel = pt_prompt("  Oynatıcı adı: ").strip()
         if manuel:
