@@ -4,8 +4,10 @@ VERSION := $(shell grep '^pkgver' PKGBUILD | cut -d= -f2)
 PKGREL  := $(shell grep '^pkgrel' PKGBUILD | cut -d= -f2)
 
 aur-update:
-	git pull
 	updpkgsums
+	git add PKGBUILD
+	git diff --cached --quiet || git commit -m "chore: update sha256sums"
+	git pull --rebase
 	makepkg --printsrcinfo > .SRCINFO
 	cp PKGBUILD .SRCINFO ../chevren-aur/
 	cd ../chevren-aur && \
