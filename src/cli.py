@@ -116,8 +116,22 @@ def cmd_setup():
 
     detected = config.detect_hardware()["whisper_model"]
     current = cfg.get("whisper_model", detected)
-    model = input(f"Whisper modeli [{detected} önerilen, şu an: {current}]: ").strip()
-    cfg["whisper_model"] = model if model else detected
+    whisper_models = [
+        ("tiny",              "~40 MB  · en hızlı, düşük kalite"),
+        ("base",              "~75 MB  · hızlı, orta kalite"),
+        ("small",             "~240 MB · dengeli"),
+        ("medium",            "~770 MB · iyi kalite"),
+        ("large-v3",          "~1.5 GB · en iyi kalite"),
+        ("large-v3-turbo",    "~810 MB · large kalitesi, daha hızlı"),
+    ]
+    print("\n── Whisper Modeli ───────────────────────────────")
+    for name, desc in whisper_models:
+        star = "★" if name == detected else " "
+        curr = " ◄ şu an" if name == current else ""
+        print(f"  {star} {name:<20} {desc}{curr}")
+    print()
+    model = input(f"  Model [{current}]: ").strip()
+    cfg["whisper_model"] = model if model else current
 
     # --- Gemini Model Sırası ---
     print("\n── Gemini Model Sırası ──────────────────────────")
