@@ -71,90 +71,226 @@ OPTIONS:
 """
 
 
+def _pick(title: str, items: list, current_idx: int = 0, extra_prompt: str = None) -> int | str | None:
+    """
+    Ok tuşu ile navigasyon. items: [(label, desc)] listesi.
+    Enter → seçili index döner.
+    extra_prompt varsa 'e) <extra_prompt>' seçeneği de gösterilir → "extra" string döner.
+    ESC/q → None döner (değiştirme).
+    """
+    from prompt_toolkit import Application
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.layout import Layout
+    from prompt_toolkit.layout.containers import Window
+    from prompt_toolkit.layout.controls import FormattedTextControl
+    from prompt_toolkit.styles import Style
+
+    idx = [current_idx]
+    result = [None]
+    cancelled = [False]
+
+    style = Style.from_dict({
+        "selected": "bold #00afff",
+        "marker":   "#ffaf00",
+        "desc":     "#888888",
+        "extra":    "#00af87",
+        "header":   "bold",
+    })
+
+    def get_text():
+        lines = []
+        for i, (label, desc) in enumerate(items):
+            if i == idx[0]:
+                lines.append(("class:selected", f"  ❯ {label:<22}"))
+                lines.append(("class:desc",     f" {desc}\n"))
+            else:
+                lines.append(("",               f"    {label:<22}"))
+                lines.append(("class:desc",     f" {desc}\n"))
+        if extra_prompt:
+            marker = "❯" if idx[0] == len(items) else " "
+            sel = idx[0] == len(items)
+            cls = "class:extra" if sel else ""
+            lines.append((cls, f"  {marker} {extra_prompt}\n"))
+        lines.append(("class:desc", "\n  ↑↓ gezin  Enter seç  ESC vazgeç\n"))
+        return lines
+
+    kb = KeyBindings()
+    total = [len(items) + (1 if extra_prompt else 0)]
+
+    @kb.add("up")
+    def _up(event):
+        idx[0] = (idx[0] - 1) % total[0]
+
+    @kb.add("down")
+    def _down(event):
+        idx[0] = (idx[0] + 1) % total[0]
+
+    @kb.add("enter")
+    def _enter(event):
+        if extra_prompt and idx[0] == len(items):
+            result[0] = "extra"
+        else:
+            result[0] = idx[0]
+        event.app.exit()
+
+    @kb.add("escape")
+    @kb.add("q")
+    def _cancel(event):
+        cancelled[0] = True
+        event.app.exit()
+
+    app = Application(
+        layout=Layout(Window(content=FormattedTextControl(get_text, focusable=False))),
+        key_bindings=kb,
+        style=style,
+        full_screen=False,
+        mouse_support=False,
+    )
+    app.run()
+    if cancelled[0]:
+        return None
+    return result[0]
+
+
 def cmd_setup():
+    import getpass
+    from prompt_toolkit import prompt as pt_prompt
+    from prompt_toolkit.validation import Validator
+
     print("Chevren kurulum sihirbazı\n")
     cfg = config.load()
-    import getpass
-    import readline  # ok tuşları + backspace için
-    _ = readline  # kullanılmıyor uyarısını bastır
 
     # --- Gemini API Keys ---
-    print("\n── Gemini API Key'leri ──────────────────────────")
-    keys = config.get_api_keys()
-    if keys:
-        for i, k in enumerate(keys):
-            masked = k[:8] + "●" * (len(k) - 8) if len(k) > 8 else "●●●●●●●●"
-            print(f"  {i + 1}. {masked}")
-    else:
-        print("  (henüz key yok)")
+    while True:
+        print("\n── Gemini API Key'leri ──────────────────────────")
+        keys = config.get_api_keys()
+        key_items = []
+        for k in keys:
+            masked = k[:8] + "●●●●●●●●" if len(k) > 8 else "●●●●●●●●"
+            key_items.append((masked, ""))
+        key_items.append(("+ Yeni key ekle", ""))
+        if keys:
+            key_items.append(("− Key sil",      ""))
+        key_items.append(("→ Devam et",      ""))
 
-    print()
-    print("  a) Yeni key ekle")
-    if keys:
-        print("  d) Key sil")
-    print("  Enter) Değiştirme")
-    secim = input("\nSeçim: ").strip().lower()
+        continue_idx = len(key_items) - 1
+        secim = _pick("Gemini API Key'leri", key_items, current_idx=continue_idx)
 
-    if secim == "a":
-        yeni = getpass.getpass("  Yeni Gemini API key: ").strip()
-        if yeni:
-            keys.append(yeni)
-            cfg["gemini_api_keys"] = keys
-            cfg["gemini_api_key"] = keys[0]
-            print(f"  ✓ Key eklendi ({len(keys)} key toplam)")
-    elif secim == "d" and keys:
-        sil = input(f"  Hangi key silinsin? [1-{len(keys)}]: ").strip()
-        try:
-            idx = int(sil) - 1
-            if 0 <= idx < len(keys):
-                keys.pop(idx)
+        if secim is None or secim == continue_idx:
+            break
+        elif secim == continue_idx - (1 if keys else 0) - (1 if keys else 0):
+            # "+ Yeni key ekle" satırı
+            pass
+
+        label = key_items[secim][0] if isinstance(secim, int) else ""
+
+        if label == "+ Yeni key ekle":
+            yeni = getpass.getpass("  Yeni Gemini API key: ").strip()
+            if yeni:
+                keys = config.get_api_keys()
+                keys.append(yeni)
+                cfg["gemini_api_keys"] = keys
+                cfg["gemini_api_key"] = keys[0]
+                config.save(cfg)
+                print(f"  ✓ Key eklendi ({len(keys)} key toplam)")
+            continue
+        elif label == "− Key sil" and keys:
+            sil_items = [(k[:8] + "●●●●●●●●", "") for k in keys]
+            sil_items.append(("← Geri", ""))
+            sil_sec = _pick("Hangi key silinsin?", sil_items, current_idx=len(sil_items)-1)
+            if sil_sec is not None and sil_sec < len(keys):
+                keys.pop(sil_sec)
                 cfg["gemini_api_keys"] = keys
                 cfg["gemini_api_key"] = keys[0] if keys else ""
+                config.save(cfg)
                 print("  ✓ Key silindi")
-        except ValueError:
-            print("  Geçersiz seçim, değiştirilmedi.")
+            continue
 
+    # --- Whisper Modeli ---
     detected = config.detect_hardware()["whisper_model"]
-    current = cfg.get("whisper_model", detected)
+    current_whisper = cfg.get("whisper_model", detected)
     whisper_models = [
-        ("tiny",              "~40 MB  · en hızlı, düşük kalite"),
-        ("base",              "~75 MB  · hızlı, orta kalite"),
-        ("small",             "~240 MB · dengeli"),
-        ("medium",            "~770 MB · iyi kalite"),
-        ("large-v3",          "~1.5 GB · en iyi kalite"),
-        ("large-v3-turbo",    "~810 MB · large kalitesi, daha hızlı"),
+        ("tiny",           "~40 MB  · en hızlı, düşük kalite"),
+        ("base",           "~75 MB  · hızlı, orta kalite"),
+        ("small",          "~240 MB · dengeli"),
+        ("medium",         "~770 MB · iyi kalite"),
+        ("large-v3",       "~1.5 GB · en iyi kalite"),
+        ("large-v3-turbo", "~810 MB · large kalitesi, daha hızlı"),
     ]
-    print("\n── Whisper Modeli ───────────────────────────────")
-    for name, desc in whisper_models:
-        star = "★" if name == detected else " "
-        curr = " ◄ şu an" if name == current else ""
-        print(f"  {star} {name:<20} {desc}{curr}")
-    print()
-    model = input(f"  Model [{current}]: ").strip()
-    cfg["whisper_model"] = model if model else current
+    names = [m[0] for m in whisper_models]
+    cur_idx = names.index(current_whisper) if current_whisper in names else 0
+    rec_idx = names.index(detected) if detected in names else 0
 
-    # --- Gemini Model Sırası ---
-    print("\n── Gemini Model Sırası ──────────────────────────")
+    # önerilen modeli label'a ekle
+    whisper_items = []
+    for name, desc in whisper_models:
+        tag = " ★ önerilen" if name == detected else ""
+        whisper_items.append((name, desc + tag))
+
+    print("\n── Whisper Modeli ───────────────────────────────")
+    sec = _pick("Whisper Modeli", whisper_items, current_idx=cur_idx,
+                extra_prompt="Manuel gir")
+    if sec is None:
+        pass  # değiştirme
+    elif sec == "extra":
+        manuel = pt_prompt("  Model adı: ").strip()
+        if manuel:
+            cfg["whisper_model"] = manuel
+            print(f"  ✓ Whisper modeli: {manuel}")
+        else:
+            print("  Geçersiz model adı, değiştirilmedi.")
+    else:
+        cfg["whisper_model"] = names[sec]
+
+    # --- Gemini Ana Model ---
     from pipeline import GEMINI_FALLBACK_MODELS
     current_primary = cfg.get("gemini_model", GEMINI_FALLBACK_MODELS[0])
     all_models = [current_primary] + [m for m in GEMINI_FALLBACK_MODELS if m != current_primary]
-    for i, m in enumerate(all_models):
-        star = "★" if i == 0 else " "
-        print(f"  {star} {i + 1}. {m}")
-    print()
-    yeni_model = input(f"  Ana model [{current_primary}]: ").strip()
-    if yeni_model:
-        cfg["gemini_model"] = yeni_model
-    print("  (Fallback sırası otomatik: flash → flash-lite → 3-flash → 3.1-flash-lite)")
+    gemini_items = [(m, "← primary" if i == 0 else "fallback") for i, m in enumerate(all_models)]
 
-    player = input(f"Oynatıcı [{cfg.get('player', 'mpv')}]: ").strip()
-    if player:
-        cfg["player"] = player
+    print("\n── Gemini Ana Model ─────────────────────────────")
+    gsec = _pick("Gemini Ana Model", gemini_items, current_idx=0,
+                 extra_prompt="Manuel gir")
+    if gsec is None:
+        pass
+    elif gsec == "extra":
+        manuel = pt_prompt("  Model adı: ").strip()
+        if manuel:
+            cfg["gemini_model"] = manuel
+            print(f"  ✓ Ana model: {manuel}")
+    else:
+        cfg["gemini_model"] = all_models[gsec]
+        fallback = [m for m in all_models if m != all_models[gsec]]
+        print(f"  ✓ Ana model: {all_models[gsec]}")
+        print(f"  Fallback sırası: {' → '.join(fallback)}")
+
+    # --- Oynatıcı ---
+    player_items = [
+        ("mpv",   "önerilen · en iyi altyazı desteği"),
+        ("vlc",   "alternatif"),
+        ("mplayer", "eski, hafif"),
+    ]
+    player_names = [p[0] for p in player_items]
+    cur_player = cfg.get("player", "mpv")
+    cur_player_idx = player_names.index(cur_player) if cur_player in player_names else 0
+    print("\n── Oynatıcı ─────────────────────────────────────")
+    psec = _pick("Oynatıcı", player_items, current_idx=cur_player_idx,
+                 extra_prompt="Manuel gir")
+    if psec is None:
+        pass
+    elif psec == "extra":
+        manuel = pt_prompt("  Oynatıcı adı: ").strip()
+        if manuel:
+            cfg["player"] = manuel
+    else:
+        cfg["player"] = player_names[psec]
+
     config.save(cfg)
     print("\nAyarlar kaydedildi.")
     print(f"Donanım: {config.hardware_summary()}")
     _enable_server_service()
     _setup_cookies()
+
 
 def _setup_cookies():
     import shutil
