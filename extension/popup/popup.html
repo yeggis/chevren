@@ -3,38 +3,147 @@
 <head>
   <meta charset="UTF-8">
   <style>
+    * { box-sizing: border-box; }
     body {
-      width: 220px;
+      width: 280px;
       font-family: system-ui, sans-serif;
-      font-size: 13px;
-      padding: 12px;
+      font-size: 12px;
       margin: 0;
-      color: #1a1a1a;
+      background: #111;
+      color: #e0e0e0;
     }
-    h2 { margin: 0 0 10px; font-size: 15px; color: #534AB7; }
-    .status-row {
+    .header {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
+      justify-content: space-between;
+      padding: 10px 12px 8px;
+    }
+    h2 { margin: 0; font-size: 14px; color: #c8a84b; letter-spacing: 0.5px; }
+    .server-status {
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
     .dot {
-      width: 8px; height: 8px;
+      width: 7px; height: 7px;
       border-radius: 50%;
-      background: #ccc;
+      background: rgba(255,255,255,0.2);
       flex-shrink: 0;
     }
-    .dot.ok { background: #1D9E75; }
-    .dot.err { background: #E24B4A; }
-    #status-text { color: #555; }
+    .dot.ok  { background: #5cb85c; }
+    .dot.err { background: #e05c5c; }
+    #server-text { font-size: 10px; color: rgba(255,255,255,0.35); }
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding: 0 12px;
+    }
+    .tab {
+      padding: 5px 10px;
+      cursor: pointer;
+      font-size: 11px;
+      color: rgba(255,255,255,0.35);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color 0.15s;
+    }
+    .tab.active { color: #c8a84b; border-bottom-color: #c8a84b; }
+    .panel { display: none; padding: 10px 12px; }
+    .panel.active { display: block; }
+    .row-label {
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+      margin: 6px 0 2px;
+    }
+    .row-label:first-child { margin-top: 0; }
+    .row-value {
+      color: #e0e0e0;
+      word-break: break-all;
+    }
+    .row-value.working { color: #c8a84b; }
+    .row-value.done    { color: #5cb85c; }
+    .row-value.err     { color: #e05c5c; }
+    #log-header {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 4px;
+    }
+    .log-actions {
+      display: flex;
+      gap: 4px;
+    }
+    .log-btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.3);
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .log-btn:hover { color: #e0e0e0; border-color: rgba(255,255,255,0.25); }
+    #log-list {
+      height: 260px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 10px;
+    }
+    .log-entry {
+      display: flex;
+      gap: 6px;
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .log-time { color: rgba(255,255,255,0.22); flex-shrink: 0; }
+    .log-msg         { color: #e0e0e0; }
+    .log-msg.working { color: #c8a84b; }
+    .log-msg.done    { color: #5cb85c; }
+    .log-msg.err     { color: #e05c5c; }
+    .log-empty {
+      color: rgba(255,255,255,0.2);
+      text-align: center;
+      padding: 30px 0;
+      font-family: system-ui;
+    }
   </style>
 </head>
 <body>
-  <h2>Chevren</h2>
-  <div class="status-row">
-    <div class="dot" id="dot"></div>
-    <span id="status-text">kontrol ediliyor...</span>
+  <div class="header">
+    <h2>chevren</h2>
+    <div class="server-status">
+      <div class="dot" id="server-dot"></div>
+      <span id="server-text">bağlanıyor</span>
+    </div>
   </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="status">Durum</div>
+    <div class="tab" data-tab="log">Log</div>
+  </div>
+
+  <div class="panel active" id="panel-status">
+    <div class="row-label">video</div>
+    <div class="row-value" id="st-video">—</div>
+    <div class="row-label">aşama</div>
+    <div class="row-value" id="st-stage">—</div>
+    <div class="row-label">parça</div>
+    <div class="row-value" id="st-chunk">—</div>
+    <div class="row-label">mesaj</div>
+    <div class="row-value" id="st-message">—</div>
+  </div>
+
+  <div class="panel" id="panel-log">
+    <div id="log-header">
+      <div class="log-actions">
+        <button class="log-btn" id="open-log">↗ tam ekran</button>
+        <button class="log-btn" id="clear-log">temizle</button>
+      </div>
+    </div>
+      <div id="log-list">
+      <div class="log-empty">henüz log yok</div>
+    </div>
+  </div>
+
   <script src="popup.js"></script>
 </body>
 </html>
