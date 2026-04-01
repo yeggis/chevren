@@ -74,8 +74,9 @@ OPTIONS:
 def cmd_setup():
     print("Chevren kurulum sihirbazı\n")
     cfg = config.load()
-
     import getpass
+    import readline  # ok tuşları + backspace için
+    _ = readline  # kullanılmıyor uyarısını bastır
 
     # --- Gemini API Keys ---
     print("\n── Gemini API Key'leri ──────────────────────────")
@@ -126,17 +127,6 @@ def cmd_setup():
     for i, m in enumerate(all_models):
         star = "★" if i == 0 else " "
         print(f"  {star} {i + 1}. {m}")
-    print()
-    print("  Kullanılabilir ek modeller:")
-    extras = [
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
-        "gemini-3-flash",
-        "gemini-3.1-flash-lite",
-    ]
-    for e in extras:
-        if e not in all_models:
-            print(f"      • {e}")
     print()
     yeni_model = input(f"  Ana model [{current_primary}]: ").strip()
     if yeni_model:
