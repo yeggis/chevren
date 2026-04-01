@@ -139,14 +139,23 @@ def _pick(title: str, items: list, current_idx: int = 0, extra_prompt: str = Non
         cancelled[0] = True
         event.app.exit()
 
-    app = Application(
-        layout=Layout(Window(content=FormattedTextControl(get_text, focusable=False))),
-        key_bindings=kb,
-        style=style,
-        full_screen=False,
-        mouse_support=False,
-    )
-    app.run()
+    import sys
+    sys.stdout.write("\033[?25l")  # cursor gizle
+    sys.stdout.flush()
+    try:
+        app = Application(
+            layout=Layout(Window(
+                content=FormattedTextControl(get_text, focusable=True, show_cursor=False),
+            )),
+            key_bindings=kb,
+            style=style,
+            full_screen=False,
+            mouse_support=False,
+        )
+        app.run()
+    finally:
+        sys.stdout.write("\033[?25h")  # cursor geri göster
+        sys.stdout.flush()
     if cancelled[0]:
         return None
     return result[0]
