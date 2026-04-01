@@ -141,22 +141,57 @@ GEMINI_FALLBACK_MODELS = [
 ]
 
 
-def _translate_chunk(
-    client,
-    model_name: str,
-    blocks: list[dict],
-    chunk_index: int,
-    exhausted_models: set = None,
-) -> list[dict]:
-    """Bir segment grubunu Türkçe'ye çevirir.
-    Kota dolduğunda: o modeli exhausted_models'e ekle, AYNI CHUNK'I sonraki
-    modelle hemen dene. Başka bir hata olduğunda: max_retries kadar bekleyerek
-    tekrar dene. Tüm modeller tükenirse zaten chunk'ı İngilizce bırak.
-    """
-    if exhausted_models is None:
-        exhausted_models = set()
+class _KeyPool:
+    """Çoklu API key + model rotasyonu. Kota dolunca sıradaki key/model'e geçer."""
 
-    # Sadece text satırlarını gönder — timestamp ve numara gösterme
+    def __init__(self, keys: list[str], base_model: str):
+        from google import genai
+
+        if not keys:
+            raise ValueError("Gemini API key eksik. 'chevren setup' ile ekleyin.")
+        self.base_model = base_model
+        self._clients = [genai.Client(api_key=k) for k in keys]
+        self._exhausted: dict[int, set] = {i: set() for i in range(len(keys))}
+        self._idx = 0
+
+    @property
+    def client(self):
+        return self._clients[self._idx]
+
+    def _available(self, idx: int) -> list[str]:
+        all_m = [self.base_model] + [
+            m for m in GEMINI_FALLBACK_MODELS if m != self.base_model
+        ]
+        return [m for m in all_m if m not in self._exhausted[idx]]
+
+    @property
+    def current_model(self) -> str | None:
+        m = self._available(self._idx)
+        return m[0] if m else None
+
+    def exhaust_model(self, model: str) -> None:
+        self._exhausted[self._idx].add(model)
+
+    def advance(self) -> bool:
+        """Sonraki kullanılabilir key'e geç. False → hepsi tükendi."""
+        for i in range(self._idx + 1, len(self._clients)):
+            if self._available(i):
+                print(f"  API key rotasyonu: key[{self._idx}] → key[{i}]")
+                self._idx = i
+                return True
+        return False
+
+    def label(self, model: str) -> str:
+        return f"key[{self._idx}]/{model}"
+
+
+def _translate_chunk(
+    pool: "_KeyPool", blocks: list[dict], chunk_index: int
+) -> list[dict]:
+    """Bir segment grubunu çevirir. Kota bitince key/model rotasyonu yapar,
+    chunk asla atlanmaz — tüm key+model combolar tükenirse İngilizce bırakır."""
+    import re
+
     texts = [b["text"] for b in blocks]
     numbered = "\n".join(f"{i + 1}. {t}" for i, t in enumerate(texts))
     prompt = (
@@ -166,80 +201,73 @@ def _translate_chunk(
         "Do not add any other text or explanation.\n\n" + numbered
     )
 
-    all_models = [model_name] + [m for m in GEMINI_FALLBACK_MODELS if m != model_name]
-
-    for model in all_models:
-        if model in exhausted_models:
-            continue  # bu model daha önce kota doldu, atla
-
-        print(f"  Chunk {chunk_index}: [{model}] deneniyor...")
-        success = False
-        for attempt in range(3):
-            try:
-                tr_text = client.models.generate_content(
-                    model=model, contents=prompt
-                ).text.strip()
-                # Numaralı satırları parse et: "1. metin" → ["metin", ...]
-                tr_lines = {}
-                for line in tr_text.splitlines():
-                    line = line.strip()
-                    if not line:
-                        continue
-                    import re
-
-                    m = re.match(r"^(\d+)\.\s*(.*)", line)
-                    if m:
-                        tr_lines[int(m.group(1))] = m.group(2)
-                # Timestamp'leri orijinalden al, sadece text'i Gemini'den al
-                tr_chunk = []
-                for i, b in enumerate(blocks):
-                    translated_text = tr_lines.get(i + 1, b["text"])
-                    tr_chunk.append({**b, "text": translated_text})
-                success = True
-                return tr_chunk
-            except Exception as e:
-                err = str(e)
-                is_quota = "429" in err or "RESOURCE_EXHAUSTED" in err
-                if is_quota:
-                    print(
-                        f"  Chunk {chunk_index}: [{model}] kota doldu → sonraki model deneniyor"
-                    )
-                    exhausted_models.add(model)
-                    break  # bu modeli bırak, for model döngüsünün sonraki modeline geç
+    attempt = 0
+    while True:
+        model = pool.current_model
+        if model is None:
+            if not pool.advance():
                 print(
-                    f"  Chunk {chunk_index}: [{model}] hata (deneme {attempt + 1}/3): {e}"
+                    f"  Chunk {chunk_index}: tüm key ve modeller tükendi, İngilizce bırakıldı."
                 )
-                if attempt < 2:
-                    import re
+                return blocks
+            attempt = 0
+            continue
 
-                    match = re.search(r"retryDelay.*?(\d+)s", err)
-                    wait = int(match.group(1)) + 2 if match else 5 * (attempt + 1)
-                    print(f"  {wait} saniye bekleniyor...")
-                    time.sleep(wait)
+        print(f"  Chunk {chunk_index}: [{pool.label(model)}] deneniyor...")
+        try:
+            tr_text = pool.client.models.generate_content(
+                model=model, contents=prompt
+            ).text.strip()
 
-        if success:
-            break  # başarıyla döndü (aslında return ile zaten çıkmış olur)
+            tr_lines = {}
+            for line in tr_text.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                m = re.match(r"^(\d+)\.\s*(.*)", line)
+                if m:
+                    tr_lines[int(m.group(1))] = m.group(2)
 
-    print(f"  Chunk {chunk_index}: tüm modeller tükendi, İngilizce bırakıldı.")
-    return blocks
+            return [
+                {**b, "text": tr_lines.get(i + 1, b["text"])}
+                for i, b in enumerate(blocks)
+            ]
+
+        except Exception as e:
+            err = str(e)
+            if "429" in err or "RESOURCE_EXHAUSTED" in err:
+                print(
+                    f"  Chunk {chunk_index}: [{pool.label(model)}] kota doldu → rotasyon"
+                )
+                pool.exhaust_model(model)
+                attempt = 0
+                # model yoksa advance() while başında tetiklenir
+                continue
+
+            attempt += 1
+            if attempt >= 3:
+                print(
+                    f"  Chunk {chunk_index}: [{pool.label(model)}] 3 denemede başarısız → model değiştir"
+                )
+                pool.exhaust_model(model)
+                attempt = 0
+                continue
+
+            match = re.search(r"retryDelay.*?(\d+)s", err)
+            wait = int(match.group(1)) + 2 if match else 5 * attempt
+            print(f"  Chunk {chunk_index}: hata (deneme {attempt}/3): {e}")
+            print(f"  {wait} saniye bekleniyor...")
+            time.sleep(wait)
 
 
 def _translate(srt_en: str) -> str:
-    """Eski toplu çeviri — geriye dönük uyumluluk için korundu."""
-    from google import genai
-
-    api_key = config.get("gemini_api_key")
-    if not api_key:
-        raise ValueError("Gemini API key eksik. 'chevren setup' ile ekleyin.")
-    client = genai.Client(api_key=api_key)
-    model_name = config.get("gemini_model")
+    pool = _KeyPool(config.get_api_keys(), config.get("gemini_model"))
     blocks = _parse_srt(srt_en)
     chunks = [blocks[i : i + CHUNK_SIZE] for i in range(0, len(blocks), CHUNK_SIZE)]
     tr_all = []
-    exhausted_models = set()
     for ci, chunk in enumerate(chunks, 1):
         print(f"  Çeviri: {ci}/{len(chunks)}")
-        tr_all.extend(_translate_chunk(client, model_name, chunk, ci, exhausted_models))
+        tr_all.extend(_translate_chunk(pool, chunk, ci))
     return _blocks_to_srt(tr_all)
 
 
@@ -344,11 +372,7 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
     _status(stage="downloading", video_id=video_id)
     wav = _extract_audio(source, workdir)
 
-    api_key = config.get("gemini_api_key")
-    if not api_key:
-        raise ValueError("Gemini API key eksik. 'chevren setup' ile ekleyin.")
-    client = genai.Client(api_key=api_key)
-    model_name = config.get("gemini_model")
+    pool = _KeyPool(config.get_api_keys(), config.get("gemini_model"))
 
     _status(stage="transcribing", video_id=video_id)
     model = WhisperModel(
@@ -369,7 +393,6 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
     blk_count = 0
     chunk_num = 0
     ready_sent = False
-    exhausted_models = set()
 
     for seg in segments:
         seg_count += 1
@@ -383,9 +406,7 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
         if len(pending) >= STREAM_CHUNK:
             chunk_num += 1
             print(f"  Çeviri: chunk {chunk_num} ({seg_count} segment işlendi)")
-            translated = _translate_chunk(
-                client, model_name, pending, chunk_num, exhausted_models
-            )
+            translated = _translate_chunk(pool, pending, chunk_num)
             translated = _renumber(translated, blk_count + 1)
             _append_srt(srt_path, translated)
             _status(stage="translating", chunk=chunk_num, video_id=video_id)

@@ -50,6 +50,7 @@ def detect_hardware() -> dict:
 def _build_defaults() -> dict:
     hw = detect_hardware()
     return {
+        "gemini_api_keys": [],
         "gemini_api_key": "",
         "gemini_model": "gemini-2.5-flash-lite",
         "whisper_model": hw["whisper_model"],
@@ -77,6 +78,16 @@ def save(cfg: dict) -> None:
     CONFIG_FILE.write_text(
         json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8"
     )
+
+
+def get_api_keys() -> list[str]:
+    """Tüm API key'leri liste döner. Eski tek-key formatıyla uyumlu."""
+    cfg = load()
+    keys = cfg.get("gemini_api_keys")
+    if keys and isinstance(keys, list):
+        return [k for k in keys if k]
+    single = cfg.get("gemini_api_key", "")
+    return [single] if single else []
 
 
 def get(key: str):
