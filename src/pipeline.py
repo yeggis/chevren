@@ -356,19 +356,27 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
               Signature: on_ready(srt_path: Path)
     """
     from faster_whisper import WhisperModel
-    from google import genai
-
     video_id = _extract_video_id(source)
+    try:
+        return _run_streaming_inner(source, workdir, video_id, on_ready)
+    except Exception as e:
+        import traceback
+        msg = traceback.format_exc().strip().splitlines()[-1]
+        print(f"PIPELINE HATA: {msg}", flush=True)
+        _status(stage="error", video_id=video_id, message=msg)
+        raise
+
+
+def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=None) -> Path:
+    from faster_whisper import WhisperModel
     if cache.exists(video_id):
         print(f"Cache bulundu: {video_id}")
         srt_path = cache.path(video_id)
         if on_ready:
             on_ready(srt_path)
         return srt_path
-
-    print(f"İşleniyor: {source}")
+    print(f"İşleniyor: {source}", flush=True)
     workdir.mkdir(parents=True, exist_ok=True)
-
     _status(stage="downloading", video_id=video_id)
     wav = _extract_audio(source, workdir)
 
@@ -420,9 +428,7 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
     if pending:
         chunk_num += 1
         print(f"  Çeviri: chunk {chunk_num} (son)")
-        translated = _translate_chunk(
-            client, model_name, pending, chunk_num, exhausted_models
-        )
+        translated = _translate_chunk(pool, pending, chunk_num)
         translated = _renumber(translated, blk_count + 1)
         _append_srt(srt_path, translated)
         _status(stage="translating", chunk=chunk_num, video_id=video_id)
@@ -430,11 +436,12 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
 
     del model
     gc.collect()
-
     cache.write(video_id, srt_path.read_text(encoding="utf-8"))
-
     if not ready_sent and on_ready:
         on_ready(srt_path)
+    _status(stage="ready", video_id=video_id)
+    print(f"Tamamlandı → {srt_path}")
+    return srt_path
 
     _status(stage="ready", video_id=video_id)
     print(f"Tamamlandı → {srt_path}")
