@@ -19,6 +19,7 @@ import config
 
 CHUNK_SIZE = 150
 STREAM_CHUNK = 30  # streaming modunda kaç segment birikince çeviri başlasın
+CONTEXT_SIZE = 5   # chunk başına önceki chunk'tan kaç blok context eklenir
 
 
 def _status(**kw):
@@ -117,118 +118,6 @@ def _yt_dlp_cookie_args() -> list:
     return []
 
 
-def _fetch_youtube_transcript(source: str, workdir: Path, lang: str) -> str | None:
-    """YouTube'un kendi transkriptini çeker, SRT string döner.
-    Yoksa veya hata olursa None döner."""
-    if not source.startswith("http"):
-        return None
-    if not config.get("use_youtube_transcript"):
-        return None
-    try:
-        vtt_path = workdir / "transcript.vtt"
-        args = [
-            "yt-dlp",
-            "--write-auto-sub",
-            "--write-sub",
-            "--sub-lang", lang,
-            "--sub-format", "vtt",
-            "--skip-download",
-            "--no-warnings",
-            "-o", str(workdir / "transcript"),
-            source,
-        ]
-        kind, value = _detect_cookie_browser()
-        if kind == "file":
-            args += ["--cookies", value]
-        elif kind == "browser":
-            args += ["--cookies-from-browser", value]
-        result = subprocess.run(args, capture_output=True, text=True)
-        # yt-dlp dosyayı {lang}.vtt veya {lang}-auto.vtt olarak kaydeder
-        candidates = list(workdir.glob("transcript*.vtt"))
-        if not candidates:
-            return None
-        vtt_content = candidates[0].read_text(encoding="utf-8")
-        return _vtt_to_srt(vtt_content)
-    except Exception as e:
-        print(f"  YouTube transkript alınamadı: {e}")
-        return None
-
-def _vtt_to_srt(vtt: str) -> str:
-    """YouTube auto-caption VTT'yi SRT'ye çevirir.
-
-    YouTube VTT formatı: her ~2s'lik pencere için iki blok gelir:
-      Blok A (~10ms): sadece tamamlanmış metin (düz, tag yok)
-      Blok B (~2s):   önceki metin + yeni kelimeler (<c> tag'li)
-
-    Strateji: sadece Blok B'leri al (süre > 50ms), her birinden
-    sadece birinci satırı (tamamlanmış metin) oku."""
-    import re
-
-    def _ts_to_ms(ts: str) -> int:
-        ts = ts.replace(",", ".")
-        h, m, s = ts.split(":")
-        return int(h) * 3_600_000 + int(m) * 60_000 + int(float(s) * 1000)
-
-    lines = vtt.splitlines()
-    segments = []
-    i = 0
-
-    while i < len(lines):
-        line = lines[i].strip()
-        m = re.match(r"(\d{2}:\d{2}:[\d.]+)\s*-->\s*(\d{2}:\d{2}:[\d.]+)", line)
-        if m:
-            start_raw = m.group(1)
-            end_raw = m.group(2)
-            duration = _ts_to_ms(end_raw) - _ts_to_ms(start_raw)
-            i += 1
-
-            block_lines = []
-            while i < len(lines) and lines[i].strip():
-                block_lines.append(lines[i].strip())
-                i += 1
-
-            # Sadece uzun blokları işle (Blok B), kısa geçiş bloklarını atla
-            if duration <= 50:
-                continue
-
-            # Birinci satır = tamamlanmış metin (tag'siz)
-            completed = None
-            for bl in block_lines:
-                if not bl or bl == " ":
-                    continue
-                clean = re.sub(r"<[^>]+>", "", bl).strip()
-                if clean:
-                    completed = clean
-                    break
-
-            if completed:
-                start = start_raw.replace(".", ",")
-                end = end_raw.replace(".", ",")
-                segments.append((start, end, completed))
-        else:
-            i += 1
-
-    if not segments:
-        return ""
-
-    # Ardışık duplicate metinleri birleştir
-    merged = [list(segments[0])]
-    for start, end, text in segments[1:]:
-        if text == merged[-1][2]:
-            merged[-1][1] = end
-        else:
-            merged.append([start, end, text])
-
-    # Her bloğun end'ini bir sonrakinin start'ına eşitle — boşlukları kapat
-    for i in range(len(merged) - 1):
-        merged[i][1] = merged[i + 1][0]
-
-    lines_out = []
-    for idx, (start, end, text) in enumerate(merged, 1):
-        lines_out.append(f"{idx}\n{start} --> {end}\n{text}\n")
-    return "\n".join(lines_out)
-
-
 def _extract_audio(source: str, workdir: Path) -> Path:
     wav = workdir / "audio.wav"
     if source.startswith("http"):
@@ -252,6 +141,14 @@ GEMINI_FALLBACK_MODELS = [
     "gemini-3.1-flash-lite-preview", # 3. en yüksek kota (500 RPD) — kota kurtarıcı
     "gemini-3-flash-preview",        # 4. son çare (20 RPD)
 ]
+
+def _protected_names_rule() -> str:
+    """config'deki protected_names listesinden prompt kuralı üretir."""
+    names = config.get("protected_names") or []
+    if not names:
+        return ""
+    return f" Do NOT translate or alter these proper nouns: {', '.join(names)}."
+
 
 class _KeyPool:
     """Çoklu API key + model rotasyonu.
@@ -308,20 +205,37 @@ class _KeyPool:
 
 
 def _translate_chunk(
-    pool: "_KeyPool", blocks: list[dict], chunk_index: int
+    pool: "_KeyPool", blocks: list[dict], chunk_index: int,
+    context: list[dict] | None = None,
 ) -> list[dict]:
     """Bir segment grubunu çevirir. Kota bitince key/model rotasyonu yapar,
-    chunk asla atlanmaz — tüm key+model combolar tükenirse İngilizce bırakır."""
+    chunk asla atlanmaz — tüm key+model combolar tükenirse İngilizce bırakır.
+    context: önceki chunk'tan son N blok — çevrilmez, sadece bağlam için."""
     import re
 
     texts = [b["text"] for b in blocks]
     numbered = "\n".join(f"{i + 1}. {t}" for i, t in enumerate(texts))
-    prompt = (
-        "Translate each numbered line to Turkish. "
-        "Output ONLY the translations, one per line, with the same numbers. "
-        "Example: '1. Hello' → '1. Merhaba'. "
-        "Do not add any other text or explanation.\n\n" + numbered
-    )
+
+    _pn = _protected_names_rule()
+    if context:
+        ctx_lines = "\n".join(f"[context] {b['text']}" for b in context)
+        prompt_body = ctx_lines + "\n" + numbered
+        prompt = (
+            "Translate each NUMBERED line to Turkish."
+            + _pn
+            + " Lines starting with [context] are for reference only — DO NOT translate them. "
+            "Output ONLY the numbered translations, one per line, using EXACTLY this format: N. translation "
+            "(number, dot, space, text). No bold, no parentheses, no extra lines, no explanation. "
+            "Example: '1. Hello world' → '1. Merhaba dünya'.\n\n" + prompt_body
+        )
+    else:
+        prompt = (
+            "Translate each numbered line to Turkish."
+            + _pn
+            + " Output ONLY the translations, one per line, using EXACTLY this format: N. translation "
+            "(number, dot, space, text). No bold, no parentheses, no extra lines, no explanation. "
+            "Example: '1. Hello world' → '1. Merhaba dünya'.\n\n" + numbered
+        )
 
     attempt = 0
     while True:
@@ -340,10 +254,13 @@ def _translate_chunk(
                 line = line.strip()
                 if not line:
                     continue
-                m = re.match(r"^(\d+)\.\s*(.*)", line)
+                m = re.match(r"^\**\s*(\d+)\s*[.):\-]\**\s*(.*)", line)
                 if m:
-                    tr_lines[int(m.group(1))] = m.group(2)
-
+                    val = m.group(2).rstrip("*").strip()
+                    if val:
+                        tr_lines[int(m.group(1))] = val
+            if len(tr_lines) != len(blocks):
+                print(f"  ⚠ Chunk {chunk_index}: {len(blocks)} girdi → {len(tr_lines)} çıktı")
             return [
                 {**b, "text": tr_lines.get(i + 1, b["text"])}
                 for i, b in enumerate(blocks)
@@ -385,32 +302,10 @@ def _translate(srt_en: str) -> str:
     tr_all = []
     for ci, chunk in enumerate(chunks, 1):
         print(f"  Çeviri: {ci}/{len(chunks)}")
-        tr_all.extend(_translate_chunk(pool, chunk, ci))
+        ctx = tr_all[-CONTEXT_SIZE:] if tr_all else None
+        tr_all.extend(_translate_chunk(pool, chunk, ci, context=ctx))
     return _blocks_to_srt(tr_all)
 
-
-def _srt_to_segments(srt: str):
-    """SRT string'i streaming loop'u için segment iterator'a çevirir.
-    Her eleman .text ve zaman damgası içeren basit nesne döner."""
-    class _Seg:
-        __slots__ = ("start", "end", "text")
-        def __init__(self, start, end, text):
-            self.start = start
-            self.end = end
-            self.text = text
-
-    def _ts_to_sec(ts: str) -> float:
-        ts = ts.replace(",", ".")
-        parts = ts.split(":")
-        h, m, s = int(parts[0]), int(parts[1]), float(parts[2])
-        return h * 3600 + m * 60 + s
-
-    blocks = _parse_srt(srt)
-    result = []
-    for b in blocks:
-        parts = b["ts"].split(" --> ")
-        result.append(_Seg(_ts_to_sec(parts[0]), _ts_to_sec(parts[1]), b["text"]))
-    return result
 
 def _renumber(blocks: list[dict], start: int) -> list[dict]:
     """Blokları verilen numaradan itibaren yeniden numaralandırır."""
@@ -520,30 +415,26 @@ def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=Non
     workdir.mkdir(parents=True, exist_ok=True)
     source_lang = config.get("source_lang") or "en"
     pool = _KeyPool(config.get_api_keys(), config.get("gemini_model"))
-
-    # YouTube transkriptini dene
     _status(stage="downloading", video_id=video_id)
-    yt_srt = _fetch_youtube_transcript(source, workdir, source_lang)
-
-    if yt_srt:
-        print("  YouTube transkripti kullanılıyor.")
-        _status(stage="transcribing", video_id=video_id, message="YouTube transkripti")
-        segments = _srt_to_segments(yt_srt)
-        use_whisper = False
-    else:
-        wav = _extract_audio(source, workdir)
-        _status(stage="transcribing", video_id=video_id)
-        model = WhisperModel(
-            config.get("whisper_model"),
-            device=config.get("whisper_device"),
-            compute_type=config.get("compute_type"),
+    wav = _extract_audio(source, workdir)
+    _status(stage="transcribing", video_id=video_id)
+    model = WhisperModel(
+        config.get("whisper_model"),
+        device=config.get("whisper_device"),
+        compute_type=config.get("compute_type"),
+    )
+    segments, _ = model.transcribe(
+        str(wav), language=source_lang, beam_size=5, vad_filter=True
+    )
+    segments = list(segments)
+    if config.get("debug_save_transcript"):
+        en_srt = "\n".join(
+            f"{i}\n{_fmt_ts(s.start)} --> {_fmt_ts(s.end)}\n{s.text.strip()}\n"
+            for i, s in enumerate(segments, 1)
         )
-        segments, _ = model.transcribe(
-            str(wav), language=source_lang, beam_size=5, vad_filter=True
-        )
-        use_whisper = True
-
-
+        debug_path = cache.path(video_id).with_name(f"{video_id}.en.srt")
+        debug_path.parent.mkdir(parents=True, exist_ok=True)
+        debug_path.write_text(en_srt, encoding="utf-8")
     srt_path = cache.path(video_id)
     srt_path.parent.mkdir(parents=True, exist_ok=True)
     srt_path.write_text("", encoding="utf-8")
@@ -552,7 +443,7 @@ def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=Non
     blk_count = 0
     chunk_num = 0
     ready_sent = False
-    for seg in (segments if use_whisper else iter(segments)):
+    for seg in segments:
         seg_count += 1
         pending.append(
             {
@@ -564,7 +455,8 @@ def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=Non
         if len(pending) >= STREAM_CHUNK:
             chunk_num += 1
             print(f"  Çeviri: chunk {chunk_num} ({seg_count} segment işlendi)")
-            translated = _translate_chunk(pool, pending, chunk_num)
+            ctx = [{"text": b["text"]} for b in translated[-CONTEXT_SIZE:]] if chunk_num > 1 else None
+            translated = _translate_chunk(pool, pending, chunk_num, context=ctx)
             translated = _renumber(translated, blk_count + 1)
             _append_srt(srt_path, translated)
             _status(stage="translating", chunk=chunk_num, video_id=video_id)
@@ -578,16 +470,16 @@ def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=Non
     if pending:
         chunk_num += 1
         print(f"  Çeviri: chunk {chunk_num} (son)")
-        translated = _translate_chunk(pool, pending, chunk_num)
+        ctx = [{"text": b["text"]} for b in translated[-CONTEXT_SIZE:]] if chunk_num > 1 else None
+        translated = _translate_chunk(pool, pending, chunk_num, context=ctx)
         translated = _renumber(translated, blk_count + 1)
         _append_srt(srt_path, translated)
         _status(stage="translating", chunk=chunk_num, video_id=video_id)
         _reload_mpv_subs(srt_path)
 
-    if use_whisper:
-        del model
-        gc.collect()
-        cache.write(video_id, srt_path.read_text(encoding="utf-8"))
+    del model
+    gc.collect()
+    cache.write(video_id, srt_path.read_text(encoding="utf-8"))
     if not ready_sent and on_ready:
         on_ready(srt_path)
     _status(stage="ready", video_id=video_id)

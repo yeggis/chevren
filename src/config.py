@@ -59,7 +59,7 @@ def _build_defaults() -> dict:
         "player": "mpv",
         "source_lang": "en",
         "target_lang": "tr",
-        "use_youtube_transcript": True,
+        "debug_save_transcript": False,
         "_gpu_name": hw["gpu_name"],
         "_vram_gb": hw["vram_gb"],
     }
