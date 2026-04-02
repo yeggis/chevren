@@ -57,10 +57,12 @@ def _build_defaults() -> dict:
         "whisper_device": hw["device"],
         "compute_type": hw["compute_type"],
         "player": "mpv",
+        "source_lang": "en",
+        "target_lang": "tr",
+        "use_youtube_transcript": True,
         "_gpu_name": hw["gpu_name"],
         "_vram_gb": hw["vram_gb"],
     }
-
 
 def load() -> dict:
     defaults = _build_defaults()
