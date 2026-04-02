@@ -219,10 +219,15 @@ def _vtt_to_srt(vtt: str) -> str:
         else:
             merged.append([start, end, text])
 
+    # Her bloğun end'ini bir sonrakinin start'ına eşitle — boşlukları kapat
+    for i in range(len(merged) - 1):
+        merged[i][1] = merged[i + 1][0]
+
     lines_out = []
     for idx, (start, end, text) in enumerate(merged, 1):
         lines_out.append(f"{idx}\n{start} --> {end}\n{text}\n")
     return "\n".join(lines_out)
+
 
 def _extract_audio(source: str, workdir: Path) -> Path:
     wav = workdir / "audio.wav"
