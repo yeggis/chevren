@@ -223,6 +223,7 @@ class _KeyPool:
 def _translate_chunk(
     pool: "_KeyPool", blocks: list[dict], chunk_index: int,
     context: list[dict] | None = None,
+    on_quota_event=None,
 ) -> list[dict]:
     """Bir segment grubunu çevirir. Kota bitince key/model rotasyonu yapar,
     chunk asla atlanmaz — tüm key+model combolar tükenirse İngilizce bırakır.
@@ -288,7 +289,12 @@ def _translate_chunk(
                 print(f"  Chunk {chunk_index}: [{pool.label(model)}] kota doldu → rotasyon")
                 if not pool.exhaust_current_key(model):
                     print(f"  Chunk {chunk_index}: tüm key ve modeller tükendi, İngilizce bırakıldı.")
+                    if on_quota_event:
+                        on_quota_event(exhausted=True, model=None, label=None)
                     return blocks
+                new_model = pool.current_model
+                if on_quota_event:
+                    on_quota_event(exhausted=False, model=new_model, label=pool.label(new_model))
                 attempt = 0
                 continue
             if "503" in err or "UNAVAILABLE" in err:
@@ -311,7 +317,24 @@ def _translate_chunk(
             time.sleep(wait)
 
 
-def _translate(srt_en: str) -> str:
+def _make_quota_callback(video_id: str):
+    def cb(exhausted: bool, model, label):
+        if exhausted:
+            _status(
+                stage="translating",
+                video_id=video_id,
+                message="Tüm API kotaları doldu, çeviri İngilizce bırakılıyor.",
+            )
+        else:
+            _status(
+                stage="translating",
+                video_id=video_id,
+                message=f"Kota doldu → {label} deneniyor",
+            )
+    return cb
+
+
+def _translate(srt_en: str, video_id: str = "") -> str:
     pool = _KeyPool(config.get_api_keys(), config.get("gemini_model"))
     blocks = _parse_srt(srt_en)
     chunks = [blocks[i : i + CHUNK_SIZE] for i in range(0, len(blocks), CHUNK_SIZE)]
@@ -319,7 +342,7 @@ def _translate(srt_en: str) -> str:
     for ci, chunk in enumerate(chunks, 1):
         print(f"  Çeviri: {ci}/{len(chunks)}")
         ctx = tr_all[-CONTEXT_SIZE:] if tr_all else None
-        tr_all.extend(_translate_chunk(pool, chunk, ci, context=ctx))
+        tr_all.extend(_translate_chunk(pool, chunk, ci, context=ctx, on_quota_event=_make_quota_callback(video_id)))
     return _blocks_to_srt(tr_all)
 
 
@@ -372,7 +395,7 @@ def run(source: str, workdir: Path) -> Path:
     workdir.mkdir(parents=True, exist_ok=True)
     wav = _extract_audio(source, workdir)
     srt_en = _transcribe_full(wav)
-    srt_tr = _translate(srt_en)
+    srt_tr = _translate(srt_en, video_id=video_id)
     cache.write(video_id, srt_tr)
     print(f"Tamamlandı → {cache.path(video_id)}")
     return cache.path(video_id)
@@ -472,7 +495,7 @@ def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=Non
             chunk_num += 1
             print(f"  Çeviri: chunk {chunk_num} ({seg_count} segment işlendi)")
             ctx = [{"text": b["text"]} for b in translated[-CONTEXT_SIZE:]] if chunk_num > 1 else None
-            translated = _translate_chunk(pool, pending, chunk_num, context=ctx)
+            translated = _translate_chunk(pool, pending, chunk_num, context=ctx, on_quota_event=_make_quota_callback(video_id))
             translated = _renumber(translated, blk_count + 1)
             _append_srt(srt_path, translated)
             _status(stage="translating", chunk=chunk_num, video_id=video_id)
@@ -487,7 +510,7 @@ def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=Non
         chunk_num += 1
         print(f"  Çeviri: chunk {chunk_num} (son)")
         ctx = [{"text": b["text"]} for b in translated[-CONTEXT_SIZE:]] if chunk_num > 1 else None
-        translated = _translate_chunk(pool, pending, chunk_num, context=ctx)
+        translated = _translate_chunk(pool, pending, chunk_num, context=ctx, on_quota_event=_make_quota_callback(video_id))
         translated = _renumber(translated, blk_count + 1)
         _append_srt(srt_path, translated)
         _status(stage="translating", chunk=chunk_num, video_id=video_id)

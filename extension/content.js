@@ -217,7 +217,9 @@ function updateStrip(status) {
       showBar();
       break;
     case "translating":
-      statusText.textContent = `Çeviri yapılıyor — parça ${status.chunk ?? "…"}`;
+      statusText.textContent = status.message
+        ? status.message
+        : `Çeviri yapılıyor — parça ${status.chunk ?? "…"}`;
       subText.textContent = "Gemini";
       dot.classList.add("cv-dot-working");
       showBar();
