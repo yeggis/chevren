@@ -23,7 +23,23 @@ CONTEXT_SIZE = 5   # chunk başına önceki chunk'tan kaç blok context eklenir
 
 
 def _status(**kw):
-    print(f"CHEVREN_STATUS:{_json.dumps(kw)}", flush=True)
+    import json
+    import urllib.request
+
+    # Terminale de yazmaya devam etsin (debug için)
+    print(f"STATUS: {kw}", flush=True)
+
+    try:
+        data = json.dumps(kw).encode()
+        req = urllib.request.Request(
+            "http://127.0.0.1:7373/pipeline/status",
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=1)
+    except Exception:
+        pass
 
 
 def _fmt_ts(seconds: float) -> str:

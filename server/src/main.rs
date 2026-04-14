@@ -22,6 +22,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/status", get(routes::status::handler))
+        .route("/pipeline/status", post(routes::pipeline_status::handler))
         .route("/open", post(routes::open::handler))
         .route("/generate", post(routes::open::generate_handler))
         .route("/subtitle/reload", post(routes::subtitle::reload_handler))

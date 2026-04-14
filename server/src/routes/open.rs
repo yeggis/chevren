@@ -3,8 +3,6 @@ use crate::state::SharedState;
 use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::process::Stdio;
-use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
 #[derive(Deserialize)]
@@ -108,82 +106,17 @@ pub async fn generate_handler(
     }))
 }
 
-// ── Arka plan pipeline — stdout'u parse eder, state günceller ────────────────
+// ── Arka plan pipeline — artık sadece bekler, status Python tarafından HTTP ile güncellenir ─
 async fn run_pipeline_tracked(url: String, state: SharedState) {
-    let child = Command::new("chevren")
+    let status = Command::new("chevren")
         .args(["--no-play", &url])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn();
+        .status()
+        .await;
 
-    let mut child = match child {
-        Ok(c) => c,
-        Err(e) => {
+    match status {
+        Ok(s) if s.success() => {
             let mut s = state.lock().unwrap();
-            s.stage = "error".into();
-            s.message = Some(e.to_string());
-            return;
-        }
-    };
-
-    let mut last_stderr = String::new();
-
-    if let Some(stderr) = child.stderr.take() {
-        let state2 = state.clone();
-        tokio::spawn(async move {
-            let mut lines = BufReader::new(stderr).lines();
-            while let Ok(Some(line)) = lines.next_line().await {
-                // CHEVREN_STATUS satırlarını stderr'dan da yakala
-                if let Some(json_str) = line.strip_prefix("CHEVREN_STATUS:") {
-                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
-                        let mut s = state2.lock().unwrap();
-                        if let Some(stage) = val["stage"].as_str() {
-                            s.stage = stage.to_string();
-                        }
-                        if let Some(msg) = val.get("message").and_then(|v| v.as_str()) {
-                            s.message = Some(msg.to_string());
-                        }
-                    }
-                } else {
-                    tracing::debug!("pipeline stderr: {}", line);
-                }
-            }
-        });
-    }
-
-    if let Some(stdout) = child.stdout.take() {
-        let mut lines = BufReader::new(stdout).lines();
-        while let Ok(Some(line)) = lines.next_line().await {
-            if let Some(json_str) = line.strip_prefix("CHEVREN_STATUS:") {
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
-                    let mut s = state.lock().unwrap();
-                    if let Some(stage) = val["stage"].as_str() {
-                        s.stage = stage.to_string();
-                    }
-                    if let Some(c) = val.get("chunk").and_then(|v| v.as_u64()).map(|n| n as u32) {
-                        s.chunk = Some(c);
-                        s.chunk_max = Some(s.chunk_max.unwrap_or(0).max(c));
-                    }
-                    s.video_id = val
-                        .get("video_id")
-                        .and_then(|v| v.as_str())
-                        .map(String::from);
-                    s.message = val
-                        .get("message")
-                        .and_then(|v| v.as_str())
-                        .map(String::from);
-                }
-            } else {
-                last_stderr = line.clone();
-                tracing::info!("pipeline: {}", line);
-            }
-        }
-    }
-
-    match child.wait().await {
-        Ok(status) if status.success() => {
-            let mut s = state.lock().unwrap();
-            if s.stage != "ready" {
+            if s.stage != "ready" && s.stage != "error" {
                 s.stage = "ready".into();
             }
         }
@@ -191,12 +124,8 @@ async fn run_pipeline_tracked(url: String, state: SharedState) {
             let mut s = state.lock().unwrap();
             if s.stage != "ready" {
                 s.stage = "error".into();
-                if s.message.is_none() || s.message.as_deref() == Some("Pipeline başarısız oldu") {
-                    s.message = Some(if last_stderr.is_empty() {
-                        "Pipeline başarısız oldu".into()
-                    } else {
-                        last_stderr.clone()
-                    });
+                if s.message.is_none() {
+                    s.message = Some("Pipeline başarısız oldu".into());
                 }
             }
         }
