@@ -9,4 +9,5 @@ server/target/
 *.pkg.tar.zst
 *.xpi
 src/*.egg-info/
+extension/chevren-extension/
 .SRCINFO
