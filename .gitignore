@@ -10,4 +10,7 @@ server/target/
 *.xpi
 src/*.egg-info/
 extension/chevren-extension/
+.gemini/
+conductor/
+CLAUDE.md
 .SRCINFO

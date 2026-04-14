@@ -21,6 +21,9 @@ Mimari kararlar Claude'dan gelir, Gemini uygular.
 - Çok dilli strateji: source_lang/target_lang config'den beslenir, hardcode dil kodu ekleme
 - Whisper standart transkripsiyon aracı — YouTube transkript desteği kalıcı olarak kaldırıldı
 
+## Genel Kurallar
+- Her kod değişikliğinden sonra, dosyaya yazmadan önce şu kontrolleri yap ve sonuçlarını listele: hata yolları (geçici vs kalıcı), nil/boş değer kontrolü, edge case, mevcut kodla uyum. Kontrol listesini göstermeden dosyaya yazma.
+
 ## Proje Yapısı
 chevren/
 ├── src/
@@ -41,6 +44,33 @@ chevren/
 ├── pyproject.toml
 └── requirements.txt
 
+## oh-my-gemini Configuration
+
+### Hooks
+oh-my-gemini uses Gemini CLI's hook system for deterministic behavior:
+- ✅ **Security gates**: blocks dangerous commands (e.g. `rm -rf /`).
+- ✅ **Auto-verification**: runs lint/typecheck after code changes.
+- ✅ **Context injection**: injects git history, Conductor state, and relevant files into the prompt.
+- ✅ **Git checkpoints**: ensures clean state before file modifications.
+
+### Commands
+- `/omg:status` - Show current state (GEMINI.md, Conductor tracks, hooks).
+- `/omg:plan` - Enter plan mode with full OMG context.
+- `/omg:review` - Code review of current changes against the plan.
+- `/omg:autopilot` - Autonomous task execution for quick tasks.
+- `/omg:track` - Start a new Conductor track for a feature.
+- `/omg:implement` - Execute current plan task by task.
+
+### Customization
+Create `.gemini/omg-config.json` to customize:
+```json
+{
+  "autoVerification": { "enabled": true },
+  "security": { "gitCheckpoints": true },
+  "phaseGates": { "strict": false }
+}
+```
+
 ## Teknik Notlar
 - Zen profil: ~/.zen/glevivig.Default
 - Cookie: ~/.config/chevren/cookies.txt (Netscape formatı)
@@ -50,10 +80,3 @@ chevren/
 - Çeviri parse: regex r"^\s*(\d+)\s*[.):-]\s*(.*)" — Gemini format varyantlarını yakalar
 - debug_save_transcript: config'de false — true yapılınca {video_id}.en.srt cache'e kaydedilir
 - protected_names: config listesi, prompt'a eklenir, sponsor/özel isim halüsinasyonlarına karşı
-
-## Bekleyen Görevler
-1. MPV altyazı titreme fix — Lua script (mpv/chevren.lua), MPV IPC üzerinden chunk ekleme
-2. Kota göstergesi — 429'da _status(stage="translating", message="...kotası bitti") emit et
-3. Log popup kaybolma — background script veya content.js mesajıyla çözülecek
-4. ext-v0.1.2 AMO release — overlay navigation fix içeriyor
-5. Prompt bağlam iyileştirmesi — çeviri kalitesi (C adımı)
