@@ -1,6 +1,14 @@
-use axum::{extract::Path, http::StatusCode, response::IntoResponse};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    Json,
+};
 
 use crate::routes::open::cache_path;
+use crate::state::SharedState;
+use serde::Deserialize;
+use std::path::PathBuf;
 
 /// GET /subtitle/:id — SRT içeriğini döner
 pub async fn handler(Path(video_id): Path<String>) -> impl IntoResponse {
@@ -22,19 +30,35 @@ pub async fn delete_handler(Path(video_id): Path<String>) -> impl IntoResponse {
     }
 }
 
-use axum::Json;
-use serde::Deserialize;
-use std::path::PathBuf;
-
 #[derive(Deserialize)]
 pub struct ReloadRequest {
     pub path: String,
 }
 
-pub async fn reload_handler(Json(req): Json<ReloadRequest>) -> impl IntoResponse {
+pub async fn reload_handler(
+    State(state): State<SharedState>,
+    Json(req): Json<ReloadRequest>,
+) -> impl IntoResponse {
     let path = PathBuf::from(&req.path);
-    match crate::mpv::update_subtitle(&path).await {
-        Ok(_) => (StatusCode::OK, "altyazı güncellendi".to_string()),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+
+    let track_id = {
+        let s = state.lock().unwrap();
+        s.sub_track_id
+    };
+
+    if let Some(id) = track_id {
+        match crate::mpv::reload_subtitle(id).await {
+            Ok(_) => (StatusCode::OK, "altyazı yenilendi".to_string()),
+            Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        }
+    } else {
+        match crate::mpv::add_subtitle(&path).await {
+            Ok(new_id) => {
+                let mut s = state.lock().unwrap();
+                s.sub_track_id = Some(new_id);
+                (StatusCode::OK, "altyazı eklendi".to_string())
+            }
+            Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        }
     }
 }

@@ -46,7 +46,7 @@ pub async fn handler(
                 .map_err(|e| error_response(&format!("Pipeline hatası: {e}")))?;
         }
     }
-    mpv::open_with_subtitle(&req.url, &srt_path)
+    mpv::open_with_subtitle(&req.url, &srt_path, &state)
         .await
         .map_err(|e| error_response(&format!("mpv hatası: {e}")))?;
     Ok(Json(OpenResponse {
