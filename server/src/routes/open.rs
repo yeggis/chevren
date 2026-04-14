@@ -88,11 +88,16 @@ pub async fn generate_handler(
         }));
     }
 
-    // State'i sıfırla
+    // State'i hemen kilitle ve güncelle (race condition koruması)
     {
         let mut s = state.lock().unwrap();
+        s.stage = "downloading".into();
+        s.video_id = Some(video_id.clone());
+        s.chunk = None;
         s.chunk_max = None;
+        s.message = None;
     }
+
     // Arka planda başlat
     let state_clone = state.clone();
     let url = req.url.clone();

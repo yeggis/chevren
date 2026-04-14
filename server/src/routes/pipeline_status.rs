@@ -16,9 +16,11 @@ pub async fn handler(
 ) -> StatusCode {
     let mut s = state.lock().unwrap();
 
-    // Farklı bir video'dan gelen stale status'u yoksay
+    // Farklı bir video'dan gelen stale status'u yoksay, 
+    // ama eğer mevcut iş bittiyse (ready/error) yeni videoya izin ver.
     if let (Some(current), Some(incoming)) = (&s.video_id, &req.video_id) {
-        if current != incoming {
+        let is_finished = s.stage == "ready" || s.stage == "error";
+        if current != incoming && !is_finished {
             return StatusCode::OK;
         }
     }
