@@ -3,17 +3,29 @@ const STORAGE_KEY = "chevren_logs";
 const logWrap = document.getElementById("log-wrap");
 
 function renderLog(logs) {
+  const atBottom = logWrap.scrollHeight - logWrap.scrollTop - logWrap.clientHeight < 40;
+  while (logWrap.firstChild) logWrap.removeChild(logWrap.firstChild);
   if (!logs.length) {
-    logWrap.innerHTML = '<div class="log-empty">henüz log yok</div>';
+    const empty = document.createElement("div");
+    empty.className = "log-empty";
+    empty.textContent = "henüz log yok";
+    logWrap.appendChild(empty);
+    if (atBottom) logWrap.scrollTop = logWrap.scrollHeight;
     return;
   }
-  const atBottom = logWrap.scrollHeight - logWrap.scrollTop - logWrap.clientHeight < 40;
-  logWrap.innerHTML = logs.map(e =>
-    `<div class="log-entry">
-      <span class="log-time">${e.time}</span>
-      <span class="log-msg ${e.cls}">${e.msg}</span>
-    </div>`
-  ).join("");
+  logs.forEach(e => {
+    const entry = document.createElement("div");
+    entry.className = "log-entry";
+    const time = document.createElement("span");
+    time.className = "log-time";
+    time.textContent = e.time;
+    const msg = document.createElement("span");
+    msg.className = "log-msg " + e.cls;
+    msg.textContent = e.msg;
+    entry.appendChild(time);
+    entry.appendChild(msg);
+    logWrap.appendChild(entry);
+  });
   if (atBottom) logWrap.scrollTop = logWrap.scrollHeight;
 }
 

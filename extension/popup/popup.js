@@ -30,16 +30,27 @@ document.getElementById("open-log").addEventListener("click", () => {
 
 // ── Log render ────────────────────────────────────────────────────────────────
 function renderLog(logs) {
+  while (logList.firstChild) logList.removeChild(logList.firstChild);
   if (!logs.length) {
-    logList.innerHTML = '<div class="log-empty">henüz log yok</div>';
+    const empty = document.createElement("div");
+    empty.className = "log-empty";
+    empty.textContent = "henüz log yok";
+    logList.appendChild(empty);
     return;
   }
-  logList.innerHTML = logs.slice().reverse().map(e =>
-    `<div class="log-entry">
-      <span class="log-time">${e.time}</span>
-      <span class="log-msg ${e.cls}">${e.msg}</span>
-    </div>`
-  ).join("");
+  logs.slice().reverse().forEach(e => {
+    const entry = document.createElement("div");
+    entry.className = "log-entry";
+    const time = document.createElement("span");
+    time.className = "log-time";
+    time.textContent = e.time;
+    const msg = document.createElement("span");
+    msg.className = "log-msg " + e.cls;
+    msg.textContent = e.msg;
+    entry.appendChild(time);
+    entry.appendChild(msg);
+    logList.appendChild(entry);
+  });
 }
 
 // ── Status render ─────────────────────────────────────────────────────────────
