@@ -98,6 +98,20 @@ chrome.storage.onChanged.addListener((changes) => {
   }
 });
 
+// ── Restart ───────────────────────────────────────────────────────────────────
+document.getElementById("restart-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("restart-btn");
+  btn.textContent = "…";
+  btn.disabled = true;
+  try {
+    await fetch(`${SERVER}/restart`, { method: "POST" });
+  } catch { /* server kapanıyor, hata beklenir */ }
+  setTimeout(() => {
+    btn.textContent = "↺";
+    btn.disabled = false;
+  }, 3000);
+});
+
 // ── Başlat ────────────────────────────────────────────────────────────────────
 chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
   const url = tabs[0]?.url || "";

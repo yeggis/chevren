@@ -31,6 +31,7 @@ async fn main() {
             get(routes::subtitle::handler).delete(routes::subtitle::delete_handler),
         )
         .route("/mpv/command", post(routes::mpv_cmd::handler))
+        .route("/restart", post(routes::restart::handler))
         .with_state(shared_state)
         .layer(cors);
 
