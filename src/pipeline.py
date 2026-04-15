@@ -465,15 +465,6 @@ def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=Non
     segments, _ = model.transcribe(
         str(wav), language=source_lang, beam_size=5, vad_filter=True
     )
-    segments = list(segments)
-    if config.get("debug_save_transcript"):
-        en_srt = "\n".join(
-            f"{i}\n{_fmt_ts(s.start)} --> {_fmt_ts(s.end)}\n{s.text.strip()}\n"
-            for i, s in enumerate(segments, 1)
-        )
-        debug_path = cache.path(video_id).with_name(f"{video_id}.en.srt")
-        debug_path.parent.mkdir(parents=True, exist_ok=True)
-        debug_path.write_text(en_srt, encoding="utf-8")
     srt_path = cache.path(video_id)
     srt_path.parent.mkdir(parents=True, exist_ok=True)
     srt_path.write_text("", encoding="utf-8")
@@ -482,6 +473,8 @@ def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=Non
     blk_count = 0
     chunk_num = 0
     ready_sent = False
+    translated = []
+    debug_lines = [] if config.get("debug_save_transcript") else None
     for seg in segments:
         seg_count += 1
         pending.append(
@@ -491,10 +484,14 @@ def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=Non
                 "text": seg.text.strip(),
             }
         )
+        if debug_lines is not None:
+            debug_lines.append(
+                f"{seg_count}\n{_fmt_ts(seg.start)} --> {_fmt_ts(seg.end)}\n{seg.text.strip()}\n"
+            )
         if len(pending) >= STREAM_CHUNK:
             chunk_num += 1
             print(f"  Çeviri: chunk {chunk_num} ({seg_count} segment işlendi)")
-            ctx = [{"text": b["text"]} for b in translated[-CONTEXT_SIZE:]] if chunk_num > 1 else None
+            ctx = [{"text": b["text"]} for b in translated[-CONTEXT_SIZE:]] if translated else None
             translated = _translate_chunk(pool, pending, chunk_num, context=ctx, on_quota_event=_make_quota_callback(video_id))
             translated = _renumber(translated, blk_count + 1)
             _append_srt(srt_path, translated)
@@ -506,10 +503,14 @@ def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=Non
                 on_ready(srt_path)
                 ready_sent = True
 
+    if debug_lines is not None:
+        debug_path = cache.path(video_id).with_name(f"{video_id}.en.srt")
+        debug_path.parent.mkdir(parents=True, exist_ok=True)
+        debug_path.write_text("\n".join(debug_lines), encoding="utf-8")
     if pending:
         chunk_num += 1
         print(f"  Çeviri: chunk {chunk_num} (son)")
-        ctx = [{"text": b["text"]} for b in translated[-CONTEXT_SIZE:]] if chunk_num > 1 else None
+        ctx = [{"text": b["text"]} for b in translated[-CONTEXT_SIZE:]] if translated else None
         translated = _translate_chunk(pool, pending, chunk_num, context=ctx, on_quota_event=_make_quota_callback(video_id))
         translated = _renumber(translated, blk_count + 1)
         _append_srt(srt_path, translated)

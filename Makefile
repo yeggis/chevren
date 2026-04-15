@@ -14,3 +14,9 @@ aur-update:
 		git add PKGBUILD .SRCINFO && \
 		git commit -m "chore: update AUR package to v$(VERSION)-$(PKGREL)" || true && \
 		git push
+
+release:
+	rm -f dist/chevren-extension.zip
+	mkdir -p dist
+	cd extension && zip -r ../dist/chevren-extension.zip . -x "*.zip"
+	@echo "dist/chevren-extension.zip hazır"
