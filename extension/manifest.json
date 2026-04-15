@@ -5,16 +5,16 @@
   "description": "YouTube videolarını Türkçe altyazıyla izle",
 
   "browser_specific_settings": {
-  "gecko": {
-    "id": "chevren@yeggis",
-    "strict_min_version": "142.0",
-    "update_url": "https://yeggis.github.io/chevren/updates.json",
-    "data_collection_permissions": {
-      "required": ["none"],
-      "optional": []
+    "gecko": {
+      "id": "chevren@yeggis",
+      "strict_min_version": "142.0",
+      "update_url": "https://yeggis.github.io/chevren/updates.json",
+      "data_collection_permissions": {
+        "required": ["none"],
+        "optional": []
+      }
     }
-  }
-},
+  },
 
   "permissions": [
     "activeTab",
@@ -43,8 +43,8 @@
   ],
 
   "background": {
-  "service_worker": "background.js"
-},
+    "service_worker": "background.js"
+  },
 
   "action": {
     "default_popup": "popup/popup.html",
@@ -52,12 +52,14 @@
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
       "48": "icons/icon48.png",
-      "128": "icons/icon128.png"    }
+      "128": "icons/icon128.png"
+    }
   },
 
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
-    "128": "icons/icon128.png"  }
+    "128": "icons/icon128.png"
+  }
 }

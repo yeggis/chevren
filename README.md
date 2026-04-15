@@ -153,14 +153,21 @@ Subtitles are cached at `~/.cache/chevren/<video_id>.srt`. Re-running the same U
 
 ---
 
-## Firefox Extension
+## Browser Extension
 
 Adds a status strip below the YouTube video title and an ▶ button in the player controls to open the video in MPV.
 
-**Install (v0.1.2):**
+**Firefox (recommended) — Install via AMO (v0.1.2):**
 1. Download `chevren.xpi` from the [Releases page](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.2)
 2. Open `about:addons` in Firefox
 3. Gear icon → "Install Add-on From File" → select `chevren.xpi`
+
+**Chromium-based browsers (Chrome, Edge, Brave) — manual install:**
+1. Download and unzip the extension from the [Releases page](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.2)
+2. Open `chrome://extensions` → enable "Developer mode"
+3. "Load unpacked" → select the unzipped folder
+
+> ⚠️ Chromium-based browsers work but do not receive automatic updates — manual reinstall required on each update.
 
 **What the strip does:**
 - Idle → click to start subtitle generation
@@ -168,7 +175,7 @@ Adds a status strip below the YouTube video title and an ▶ button in the playe
 - Ready → click to toggle the in-page overlay; subtitles render over the YouTube player in sync with playback
 - The overlay updates live as new translation chunks arrive
 
-The extension popup shows server status, active pipeline stage, and a scrollable log. A restart button (↺) sends `POST /restart` to the local server, which exits cleanly and is restarted by systemd (`Restart=always`).
+The extension popup shows server status, active pipeline stage, and a scrollable log. A restart button (↺) sends `POST /restart` to the local server, which exits with code 1 and is restarted by systemd (`Restart=on-failure`).
 
 ---
 

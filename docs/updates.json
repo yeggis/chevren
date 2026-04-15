@@ -9,6 +9,10 @@
         {
           "version": "0.1.1",
           "update_link": "https://github.com/yeggis/chevren/releases/download/ext-v0.1.1/chevren.xpi"
+        },
+        {
+          "version": "0.1.2",
+          "update_link": "https://github.com/yeggis/chevren/releases/download/ext-v0.1.2/chevren.xpi"
         }
       ]
     }

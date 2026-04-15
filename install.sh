@@ -268,22 +268,22 @@ install_chevren() {
   # Kaynak: script'in bulunduğu dizin
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-  # Ana dosyaları kopyala
-  if [[ -f "$SCRIPT_DIR/chevren.py" ]]; then
-    cp "$SCRIPT_DIR/chevren.py" "$INSTALL_DIR/"
-    ok "chevren.py kopyalandı → $INSTALL_DIR/"
+  # Kaynak dosyaları kopyala
+  if [[ -d "$SCRIPT_DIR/src" ]]; then
+    cp -r "$SCRIPT_DIR/src" "$INSTALL_DIR/"
+    ok "src/ kopyalandı → $INSTALL_DIR/"
   else
-    warn "chevren.py bulunamadı. Sadece bağımlılıklar kuruldu."
-    warn "Chevren'i şuradan klonlayın: git clone https://github.com/kullanici/chevren"
+    warn "src/ dizini bulunamadı. Sadece bağımlılıklar kuruldu."
+    warn "Chevren'i şuradan klonlayın: git clone https://github.com/yeggis/chevren"
     warn "Sonra tekrar çalıştırın: bash install.sh"
     return
   fi
 
+  # requirements.txt kopyala (install_python_deps için)
+  [[ -f "$SCRIPT_DIR/requirements.txt" ]] && cp "$SCRIPT_DIR/requirements.txt" "$INSTALL_DIR/"
+
   # Wrapper script oluştur
-  cat >"$BIN_DIR/chevren" <<WRAPPER
-#!/usr/bin/env bash
-exec python3 "${INSTALL_DIR}/chevren.py" "\$@"
-WRAPPER
+  printf '#!/usr/bin/env bash\nexec python3 "%s/src/cli.py" "$@"\n' "$INSTALL_DIR" >"$BIN_DIR/chevren"
   chmod +x "$BIN_DIR/chevren"
 
   # Varsayılan config oluştur (yoksa)
