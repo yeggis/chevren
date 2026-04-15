@@ -177,6 +177,10 @@ function injectStrip() {
 let currentStage = "idle";
 
 function updateStrip(status) {
+  if (!document.getElementById("chevren-status-text") ||
+      !document.getElementById("chevren-btn-mpv")) {
+    tryInjectAll();
+  }
   const statusText = document.getElementById("chevren-status-text");
   const subText = document.getElementById("chevren-sub-text");
   const dot = document.getElementById("chevren-dot");
