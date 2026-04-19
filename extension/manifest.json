@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Chevren",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "YouTube videolarını Türkçe altyazıyla izle",
+
 
   "browser_specific_settings": {
     "gecko": {
@@ -43,8 +44,7 @@
   ],
 
   "background": {
-    "service_worker": "background.js",
-    "scripts": ["background.js"]
+    "service_worker": "background.js"
   },
 
   "action": {
