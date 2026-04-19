@@ -25,7 +25,8 @@ Chevren watches a YouTube video or local file, transcribes the audio locally wit
 - 🎤 **Local transcription** via faster-whisper (GPU-accelerated with CUDA)
 - 🌍 **Translation** via Gemini API (streaming, chunk-by-chunk)
 - 📺 **Playback** in MPV with live subtitle injection
-- 🦊 **Firefox extension** — one-click subtitle generation on YouTube, with an inline status strip and overlay renderer built into the page
+- 狐 **Firefox extension** — one-click subtitle generation on YouTube, with an inline status strip and overlay renderer built into the page
+- 🌐 **Multilingual support** — TR/EN language toggle; transcript and translation cached separately
 
 ---
 
@@ -43,16 +44,19 @@ YouTube URL / Local File
                               (chunked translation, streaming)
                                       │
                               SRT written incrementally
+                              (en.srt transcript, tr.srt translation)
                                       │
                          ┌────────────┴────────────┐
                          ▼                         ▼
                   MPV (sub-file)           Firefox Extension
-                  live sub-reload          overlay renderer
-                         │
+                  live sub-reload          glassmorphism overlay
+                         │                language toggle (TR/EN)
                   chevren-server (Rust/Axum)
                   HTTP :7373 — pipeline status,
-                  subtitle reload, MPV IPC bridge
+                  subtitle reload, MPV IPC bridge,
+                  cancel endpoint
 ```
+
 
 The Rust server is a lightweight local HTTP daemon. The Python pipeline reports its progress to the server via `POST /pipeline/status`; the extension polls `GET /status` to drive the UI.
 
@@ -149,7 +153,7 @@ chevren cache clear                                # clear cache
 chevren --help
 ```
 
-Subtitles are cached at `~/.cache/chevren/<video_id>.srt`. Re-running the same URL serves from cache instantly.
+Subtitles are cached under `~/.cache/chevren/<video_id>/` as `en.srt` (transcript) and `tr.srt` (translation). Re-running the same URL serves from cache instantly.
 
 ---
 
@@ -174,6 +178,9 @@ Adds a status strip below the YouTube video title and an ▶ button in the playe
 - Downloading / Transcribing / Translating → animated progress bar with stage label
 - Ready → click to toggle the in-page overlay; subtitles render over the YouTube player in sync with playback
 - The overlay updates live as new translation chunks arrive
+- **Settings panel (⚙ Ayarlar):** language toggle (TR/EN), open in MPV, cancel active pipeline, delete cached subtitles
+- **Overlay controls:** drag to reposition, scroll to resize text, double-click to reset position, Alt+C to toggle
+- The overlay uses a glassmorphism design and adjusts position automatically when YouTube controls appear or hide
 
 The extension popup shows server status, active pipeline stage, and a scrollable log. A restart button (↺) sends `POST /restart` to the local server, which exits with code 1 and is restarted by systemd (`Restart=on-failure`).
 

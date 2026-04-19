@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chevren"
-version = "1.0.19"
+version = "1.0.20"
 description = "YouTube videolarını yerel Whisper + Gemini ile Türkçe altyazıya çevirir"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -24,6 +24,7 @@ Chevren, bir YouTube videosu veya yerel dosyayı izlerken sesi yerel olarak Whis
 - 🌍 **Çeviri** — Gemini API üzerinden (parça parça, streaming)
 - 📺 **Oynatma** — MPV'de canlı altyazı enjeksiyonu
 - 🦊 **Firefox eklentisi** — YouTube'da tek tıkla altyazı oluşturma; sayfa içi durum göstergesi ve overlay renderer
+- 🌐 **Çok dilli destek** — TR/EN dil değiştirme; transkript ve çeviri ayrı önbellek dosyalarında
 
 ---
 
@@ -41,15 +42,17 @@ YouTube URL / Yerel Dosya
                               (parça parça çeviri, streaming)
                                       │
                               SRT dosyasına anlık yazma
+                              (en.srt transkript, tr.srt çeviri)
                                       │
                          ┌────────────┴────────────┐
                          ▼                         ▼
                   MPV (sub-file)           Firefox Eklentisi
-                  canlı altyazı yenileme   overlay renderer
-                         │
+                  canlı altyazı yenileme   glassmorphism overlay
+                         │                dil değiştirme (TR/EN)
                   chevren-server (Rust/Axum)
                   HTTP :7373 — pipeline durumu,
-                  altyazı yenileme, MPV IPC köprüsü
+                  altyazı yenileme, MPV IPC köprüsü,
+                  iptal endpoint'i
 ```
 
 Rust sunucusu hafif bir yerel HTTP daemon'dur. Python pipeline'ı ilerleme durumunu `POST /pipeline/status` ile sunucuya bildirir; eklenti `GET /status`'u poll ederek arayüzü günceller.
@@ -147,7 +150,7 @@ chevren cache clear                                # önbelleği temizle
 chevren --help
 ```
 
-Altyazılar `~/.cache/chevren/<video_id>.srt` konumunda önbelleğe alınır. Aynı URL tekrar çalıştırıldığında önbellekten anında sunulur.
+Altyazılar `~/.cache/chevren/<video_id>/` dizini altında `en.srt` (transkript) ve `tr.srt` (çeviri) olarak önbelleğe alınır. Aynı URL tekrar çalıştırıldığında önbellekten anında sunulur.
 
 ---
 
@@ -165,6 +168,9 @@ YouTube video başlığının altına bir durum şeridi ve oynatıcı kontroller
 - İndirme / Transkripsiyon / Çeviri → aşama etiketiyle animasyonlu ilerleme çubuğu
 - Hazır → tıklayarak sayfa içi overlay'i açın/kapatın; altyazılar YouTube oynatıcısının üzerinde oynatmayla senkronize görünür
 - Yeni çeviri parçaları geldikçe overlay canlı olarak güncellenir
+- **Ayarlar paneli (⚙ Ayarlar):** dil seçimi (TR/EN), MPV'de aç, aktif pipeline'ı iptal et, önbellekteki altyazıyı sil
+- **Overlay kontrolleri:** sürükleyerek konumlandırın, kaydırarak yazı boyutunu ayarlayın, çift tıklayarak sıfırlayın, Alt+C ile açın/kapatın
+- Overlay cam efektli (glassmorphism) tasarım kullanır; YouTube kontrolleri görünüp kaybolurken konumu otomatik ayarlanır
 
 Eklenti popup'ı sunucu durumunu, aktif pipeline aşamasını ve kaydırılabilir bir log gösterir. Yeniden başlatma düğmesi (↺) yerel sunucuya `POST /restart` gönderir; sunucu temiz şekilde çıkar ve systemd tarafından yeniden başlatılır.
 
