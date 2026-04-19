@@ -20,13 +20,42 @@ pub async fn handler(Path(video_id): Path<String>) -> impl IntoResponse {
     }
 }
 
-/// DELETE /subtitle/:id — Cache'den SRT siler
-pub async fn delete_handler(Path(video_id): Path<String>) -> impl IntoResponse {
-    let srt_path = cache_path(&video_id);
+/// DELETE /subtitle/:id — Cache'den tüm video klasörünü siler, state'i sıfırlar
+pub async fn delete_handler(
+    Path(video_id): Path<String>,
+    State(state): State<SharedState>,
+) -> impl IntoResponse {
+    {
+        let mut s = state.lock().unwrap();
+        if s.video_id.as_deref() == Some(&video_id) {
+            if let Some(flag) = &s.cancel_flag {
+                flag.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+            s.stage = "idle".into();
+            s.chunk = None;
+            s.chunk_max = None;
+            s.video_id = None;
+            s.message = None;
+            s.cancel_flag = None;
+        }
+    }
+    let base = directories::BaseDirs::new()
+        .map(|b| b.cache_dir().join("chevren").join(&video_id))
+        .unwrap_or_else(|| std::path::PathBuf::from(format!("/tmp/chevren/{video_id}")));
 
-    match tokio::fs::remove_file(&srt_path).await {
-        Ok(_) => (StatusCode::OK, format!("Silindi: {video_id}")),
-        Err(_) => (StatusCode::NOT_FOUND, format!("SRT bulunamadı: {video_id}")),
+    if base.exists() {
+        match tokio::fs::remove_dir_all(&base).await {
+            Ok(_) => (StatusCode::OK, format!("Silindi: {video_id}")),
+            Err(e) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Silinemedi: {e}"),
+            ),
+        }
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Cache bulunamadı: {video_id}"),
+        )
     }
 }
 

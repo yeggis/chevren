@@ -74,9 +74,12 @@ pub async fn generate_handler(
 
     let video_id =
         extract_video_id(&req.url).ok_or_else(|| error_response("Geçersiz YouTube URL'si"))?;
-    let srt_path = cache_path(&video_id);
+    let target_lang = read_target_lang().unwrap_or_else(|| "tr".to_string());
+    let srt_path = cache_path_for_lang(&video_id, &target_lang);
 
-    if srt_path.exists() {
+    // Cache'de bu dil için SRT varsa pipeline çalıştırma
+    let cache_hit = srt_path.metadata().map(|m| m.len() > 0).unwrap_or(false);
+    if cache_hit {
         let mut s = state.lock().unwrap();
         s.stage = "ready".into();
         s.video_id = Some(video_id);
@@ -88,7 +91,7 @@ pub async fn generate_handler(
         }));
     }
 
-    // State'i hemen kilitle ve güncelle (race condition koruması)
+    let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     {
         let mut s = state.lock().unwrap();
         s.stage = "downloading".into();
@@ -96,6 +99,7 @@ pub async fn generate_handler(
         s.chunk = None;
         s.chunk_max = None;
         s.message = None;
+        s.cancel_flag = Some(cancel_flag.clone());
     }
 
     // Arka planda başlat
@@ -113,6 +117,7 @@ pub async fn generate_handler(
 
 // ── Arka plan pipeline — artık sadece bekler, status Python tarafından HTTP ile güncellenir ─
 async fn run_pipeline_tracked(url: String, state: SharedState) {
+    // cancel_flag state içinde tutuluyor, ayrıca parametre gerekmez
     let status = Command::new("chevren")
         .args(["--no-play", &url])
         .status()
@@ -160,13 +165,35 @@ pub fn extract_video_id(url: &str) -> Option<String> {
 }
 
 pub fn cache_path(video_id: &str) -> PathBuf {
-    directories::BaseDirs::new()
-        .map(|b| {
-            b.cache_dir()
-                .join("chevren")
-                .join(format!("{video_id}.srt"))
-        })
-        .unwrap_or_else(|| PathBuf::from(format!("/tmp/{video_id}.srt")))
+    cache_path_for_lang(video_id, &read_target_lang().unwrap_or_else(|| "tr".to_string()))
+}
+
+pub fn cache_path_for_lang(video_id: &str, target_lang: &str) -> PathBuf {
+    let base = directories::BaseDirs::new()
+        .map(|b| b.cache_dir().join("chevren").join(video_id))
+        .unwrap_or_else(|| PathBuf::from(format!("/tmp/chevren/{video_id}")));
+    let target = base.join(format!("{target_lang}.srt"));
+    let en = base.join("en.srt");
+    let non_empty = |p: &std::path::Path| {
+        p.metadata().map(|m| m.len() > 0).unwrap_or(false)
+    };
+    if non_empty(&target) {
+        target
+    } else if non_empty(&en) {
+        en
+    } else {
+        base.join(format!("{target_lang}.srt"))
+    }
+}
+
+fn read_target_lang() -> Option<String> {
+    let config_path = directories::BaseDirs::new()?
+        .config_dir()
+        .join("chevren")
+        .join("config.json");
+    let text = std::fs::read_to_string(config_path).ok()?;
+    let val: serde_json::Value = serde_json::from_str(&text).ok()?;
+    val.get("target_lang")?.as_str().map(|s| s.to_string())
 }
 
 fn error_response(msg: &str) -> (StatusCode, Json<OpenResponse>) {

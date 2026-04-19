@@ -112,6 +112,30 @@ document.getElementById("restart-btn").addEventListener("click", async () => {
   }, 3000);
 });
 
+// ── Dil toggle ────────────────────────────────────────────────────────────────
+const LANG_KEY = "chevren_lang";
+const langBtn = document.getElementById("lang-btn");
+
+async function applyLang(lang) {
+  langBtn.textContent = lang.toUpperCase();
+  langBtn.style.color = lang === "en" ? "#6bc5f8" : "#c8a84b";
+  try {
+    await fetch(`${SERVER}/config/lang`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lang }),
+    });
+  } catch { /* server kapalıysa sessizce geç */ }
+  chrome.storage.local.set({ [LANG_KEY]: lang });
+}
+
+langBtn.addEventListener("click", () => {
+  chrome.storage.local.get(LANG_KEY, result => {
+    const current = result[LANG_KEY] || "tr";
+    applyLang(current === "tr" ? "en" : "tr");
+  });
+});
+
 // ── Başlat ────────────────────────────────────────────────────────────────────
 chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
   const url = tabs[0]?.url || "";
@@ -123,6 +147,11 @@ chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
     renderLog(result[STORAGE_KEY] || []);
   });
 
+  chrome.storage.local.get(LANG_KEY, result => {
+    const lang = result[LANG_KEY] || "tr";
+    langBtn.textContent = lang.toUpperCase();
+    langBtn.style.color = lang === "en" ? "#6bc5f8" : "#c8a84b";
+  });
   pollStatus(videoId);
   setInterval(() => pollStatus(videoId), 1000);
 });

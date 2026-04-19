@@ -20,6 +20,9 @@ import config
 CHUNK_SIZE = 150
 STREAM_CHUNK = 30  # streaming modunda kaç segment birikince çeviri başlasın
 CONTEXT_SIZE = 5   # chunk başına önceki chunk'tan kaç blok context eklenir
+MERGE_MIN_DURATION = 1.5   # saniyeden kısa segmentleri birleştir
+MERGE_MIN_CHARS = 42       # karakterden kısa segmentleri birleştir
+LOOKAHEAD = 3              # çift yönlü window için ileri/geri kaç blok
 
 
 def _status(**kw):
@@ -48,6 +51,21 @@ def _fmt_ts(seconds: float) -> str:
     m, ms = divmod(ms, 60_000)
     s, ms = divmod(ms, 1_000)
     return f"{h:02}:{m:02}:{s:02},{ms:03}"
+
+
+def _parse_duration(ts: str) -> float:
+    """'HH:MM:SS,mmm --> HH:MM:SS,mmm' → saniye cinsinden süre."""
+    start, end = ts.split(" --> ")
+    def _to_sec(t):
+        h, m, s_ms = t.strip().split(":")
+        s, ms = s_ms.replace(",", ".").split(".")
+        return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
+    return _to_sec(end) - _to_sec(start)
+
+
+def _max_chars(ts: str) -> int:
+    """Segment süresiyle orantılı max karakter limiti (Netflix ~17 cps)."""
+    return max(42, int(_parse_duration(ts) * 17))
 
 
 def _parse_srt(content: str) -> list[dict]:
@@ -151,6 +169,104 @@ def _extract_audio(source: str, workdir: Path) -> Path:
     return wav
 
 
+def _fetch_thumbnail(source: str, video_id: str, workdir: Path) -> bool:
+    """Thumbnail indirir veya ffmpeg ile üretir. Başarılıysa True döner."""
+    import shutil
+    dest = cache.thumb_path(video_id)
+    if dest.exists():
+        return True
+
+    # YouTube: yt-dlp ile thumbnail indir
+    if source.startswith("http"):
+        thumb_tmp = workdir / "thumb"
+        try:
+            args = [
+                "yt-dlp",
+                "--no-playlist",
+                "--write-thumbnail",
+                "--skip-download",
+                "--convert-thumbnails", "jpg",
+                "-o", str(thumb_tmp),
+                source,
+            ]
+            kind, value = _detect_cookie_browser()
+            if kind == "file":
+                args += ["--cookies", value]
+            elif kind == "browser":
+                args += ["--cookies-from-browser", value]
+            subprocess.run(args, check=True, capture_output=True)
+            # yt-dlp thumb.jpg veya thumb.webp.jpg gibi üretebilir
+            candidates = list(workdir.glob("thumb*.jpg"))
+            if candidates:
+                shutil.copy(candidates[0], dest)
+                return True
+        except Exception:
+            pass
+
+    # Fallback: ffmpeg ile 10. saniyeden kare al
+    # YouTube için m4a zaten indirildi, yerel dosya için source kullan
+    video_source = str(workdir / "audio.m4a") if source.startswith("http") else source
+    try:
+        subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-ss", "10",
+                "-i", video_source,
+                "-vframes", "1",
+                "-q:v", "2",
+                str(dest),
+            ],
+            check=True, capture_output=True,
+        )
+        return dest.exists()
+    except Exception:
+        return False
+
+
+def _fetch_meta(source: str, video_id: str, workdir: Path) -> None:
+    """Video başlığı ve süresini meta.json'a yazar."""
+    if source.startswith("http"):
+        try:
+            args = [
+                "yt-dlp",
+                "--no-playlist",
+                "--print", "%(title)s\t%(duration)s",
+                "--skip-download",
+                source,
+            ]
+            kind, value = _detect_cookie_browser()
+            if kind == "file":
+                args += ["--cookies", value]
+            elif kind == "browser":
+                args += ["--cookies-from-browser", value]
+            out = subprocess.check_output(args, text=True).strip()
+            parts = out.split("\t")
+            title = parts[0] if parts else video_id
+            duration = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
+            cache.write_meta(video_id, {"title": title, "duration_sec": duration})
+        except Exception:
+            pass
+    else:
+        # Yerel dosya: ffprobe ile süre al, başlık = dosya adı
+        try:
+            out = subprocess.check_output(
+                [
+                    "ffprobe", "-v", "error",
+                    "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1",
+                    source,
+                ],
+                text=True,
+            ).strip()
+            duration = int(float(out)) if out else 0
+            cache.write_meta(video_id, {
+                "title": Path(source).stem,
+                "duration_sec": duration,
+            })
+        except Exception:
+            cache.write_meta(video_id, {"title": Path(source).stem})
+
+
 GEMINI_FALLBACK_MODELS = [
     "gemini-2.5-flash",              # 1. primary (en iyi kalite, 20 RPD)
     "gemini-2.5-flash-lite",         # 2. hafif versiyon, aynı nesil (20 RPD)
@@ -222,37 +338,54 @@ class _KeyPool:
 
 def _translate_chunk(
     pool: "_KeyPool", blocks: list[dict], chunk_index: int,
-    context: list[dict] | None = None,
+    context_before: list[dict] | None = None,
+    context_after: list[dict] | None = None,
     on_quota_event=None,
 ) -> list[dict]:
     """Bir segment grubunu çevirir. Kota bitince key/model rotasyonu yapar,
     chunk asla atlanmaz — tüm key+model combolar tükenirse İngilizce bırakır.
-    context: önceki chunk'tan son N blok — çevrilmez, sadece bağlam için."""
+    context_before/after: önceki/sonraki chunk'tan bloklar — çevrilmez, sadece bağlam için."""
     import re
 
     texts = [b["text"] for b in blocks]
     numbered = "\n".join(f"{i + 1}. {t}" for i, t in enumerate(texts))
 
     _pn = _protected_names_rule()
-    if context:
-        ctx_lines = "\n".join(f"[context] {b['text']}" for b in context)
-        prompt_body = ctx_lines + "\n" + numbered
-        prompt = (
-            "Translate each NUMBERED line to Turkish."
-            + _pn
-            + " Lines starting with [context] are for reference only — DO NOT translate them. "
-            "Output ONLY the numbered translations, one per line, using EXACTLY this format: N. translation "
-            "(number, dot, space, text). No bold, no parentheses, no extra lines, no explanation. "
-            "Example: '1. Hello world' → '1. Merhaba dünya'.\n\n" + prompt_body
-        )
-    else:
-        prompt = (
-            "Translate each numbered line to Turkish."
-            + _pn
-            + " Output ONLY the translations, one per line, using EXACTLY this format: N. translation "
-            "(number, dot, space, text). No bold, no parentheses, no extra lines, no explanation. "
-            "Example: '1. Hello world' → '1. Merhaba dünya'.\n\n" + numbered
-        )
+
+    # Timing constraint: her satır için süre ve karakter limiti
+    timing_lines = []
+    for i, b in enumerate(blocks):
+        dur = _parse_duration(b["ts"])
+        mc = _max_chars(b["ts"])
+        timing_lines.append(f"{i+1}. [{dur:.1f}s, max {mc} chars] {b['text']}")
+    numbered_with_timing = "\n".join(timing_lines)
+
+    ctx_before_text = "\n".join(f"[before] {b['text']}" for b in (context_before or []))
+    ctx_after_text  = "\n".join(f"[after] {b['text']}"  for b in (context_after  or []))
+
+    parts = []
+    if ctx_before_text:
+        parts.append(ctx_before_text)
+    parts.append(numbered_with_timing)
+    if ctx_after_text:
+        parts.append(ctx_after_text)
+    prompt_body = "\n".join(parts)
+
+    has_ctx = ctx_before_text or ctx_after_text
+    ctx_note = (
+        " Lines starting with [before] or [after] are context only — DO NOT translate them."
+        if has_ctx else ""
+    )
+    prompt = (
+        "Translate each NUMBERED line to Turkish."
+        + _pn
+        + ctx_note
+        + " Each line shows display duration and max character limit in brackets — respect these limits."
+        " Output ONLY the numbered translations, one per line, using EXACTLY this format: N. translation"
+        " (number, dot, space, text). No bold, no parentheses, no extra lines, no explanation."
+        " Example: '1. Hello world' → '1. Merhaba dünya'.\n\n"
+        + prompt_body
+    )
 
     attempt = 0
     while True:
@@ -341,8 +474,9 @@ def _translate(srt_en: str, video_id: str = "") -> str:
     tr_all = []
     for ci, chunk in enumerate(chunks, 1):
         print(f"  Çeviri: {ci}/{len(chunks)}")
-        ctx = tr_all[-CONTEXT_SIZE:] if tr_all else None
-        tr_all.extend(_translate_chunk(pool, chunk, ci, context=ctx, on_quota_event=_make_quota_callback(video_id)))
+        ctx_before = tr_all[-CONTEXT_SIZE:] if tr_all else None
+        ctx_after  = chunks[ci][:LOOKAHEAD] if ci < len(chunks) else None  # ci 1-indexed, chunks 0-indexed; sadece ilk LOOKAHEAD blok
+        tr_all.extend(_translate_chunk(pool, chunk, ci, context_before=ctx_before, context_after=ctx_after, on_quota_event=_make_quota_callback(video_id)))
     return _blocks_to_srt(tr_all)
 
 
@@ -443,9 +577,11 @@ def run_streaming(source: str, workdir: Path, on_ready=None) -> Path:
 
 def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=None) -> Path:
     from faster_whisper import WhisperModel
-    if cache.exists(video_id):
+    target_lang = config.get("target_lang") or "tr"
+    if cache.exists(video_id, "en"):
         print(f"Cache bulundu: {video_id}")
-        srt_path = cache.path(video_id)
+        # target_lang SRT'si varsa onu, yoksa en.srt'i aç
+        srt_path = cache.path(video_id, target_lang) if cache.exists(video_id, target_lang) else cache.path(video_id, "en")
         if on_ready:
             on_ready(srt_path)
         _status(stage="ready", video_id=video_id)
@@ -454,8 +590,12 @@ def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=Non
     workdir.mkdir(parents=True, exist_ok=True)
     source_lang = config.get("source_lang") or "en"
     pool = _KeyPool(config.get_api_keys(), config.get("gemini_model"))
+    cache.touch_meta(video_id, source)
     _status(stage="downloading", video_id=video_id)
     wav = _extract_audio(source, workdir)
+    # Meta ve thumbnail arka planda değil, ses indirildikten hemen sonra
+    _fetch_meta(source, video_id, workdir)
+    _fetch_thumbnail(source, video_id, workdir)
     _status(stage="transcribing", video_id=video_id)
     model = WhisperModel(
         config.get("whisper_model"),
@@ -465,63 +605,141 @@ def _run_streaming_inner(source: str, workdir: Path, video_id: str, on_ready=Non
     segments, _ = model.transcribe(
         str(wav), language=source_lang, beam_size=5, vad_filter=True
     )
-    srt_path = cache.path(video_id)
-    srt_path.parent.mkdir(parents=True, exist_ok=True)
-    srt_path.write_text("", encoding="utf-8")
+    en_srt_path = cache.path(video_id, "en")
+    en_srt_path.parent.mkdir(parents=True, exist_ok=True)
+    en_srt_path.write_text("", encoding="utf-8")
+    target_lang = config.get("target_lang") or "tr"
+    do_translate = target_lang != source_lang
+    tr_srt_path = cache.path(video_id, target_lang) if do_translate else None
+    if tr_srt_path:
+        tr_srt_path.write_text("", encoding="utf-8")
     pending = []
+    translated = []
     seg_count = 0
     blk_count = 0
     chunk_num = 0
+    tr_chunk_num = 0
     ready_sent = False
-    translated = []
     debug_lines = [] if config.get("debug_save_transcript") else None
+
+    def _flush_chunk(to_translate, is_last=False):
+        """Bir EN chunk'ını yazar, gerekirse Gemini'ye gönderir, overlay'i günceller."""
+        nonlocal blk_count, translated, ready_sent, tr_chunk_num, chunk_num
+
+        chunk_num += 1
+        ctx_before = [{"text": b["text"], "ts": b["ts"]} for b in translated[-LOOKAHEAD:]] if translated else None
+        ctx_after_blocks = pending[STREAM_CHUNK:STREAM_CHUNK + LOOKAHEAD] if not is_last else []
+        ctx_after = [{"text": b["text"], "ts": b["ts"]} for b in ctx_after_blocks] if ctx_after_blocks else None
+
+        en_chunk = _renumber(to_translate, blk_count + 1)
+        _append_srt(en_srt_path, en_chunk)
+        cache.mark_lang(video_id, source_lang)
+
+        _status(stage="transcribing", chunk=chunk_num, video_id=video_id)
+
+        if do_translate:
+            tr_chunk_num += 1
+            print(f"  Çeviri: chunk {tr_chunk_num} ({seg_count} segment işlendi)")
+            result = _translate_chunk(
+                pool, to_translate, tr_chunk_num,
+                context_before=ctx_before, context_after=ctx_after,
+                on_quota_event=_make_quota_callback(video_id),
+            )
+            result = _renumber(result, blk_count + 1)
+            _append_srt(tr_srt_path, result)
+            cache.mark_lang(video_id, target_lang)
+            _status(stage="translating", chunk=tr_chunk_num, video_id=video_id)
+
+            # İlk TR chunk hazır → MPV'yi aç
+            if not ready_sent and on_ready:
+                on_ready(tr_srt_path)
+                ready_sent = True
+                _reload_mpv_subs(tr_srt_path)
+            else:
+                _reload_mpv_subs(tr_srt_path)
+        else:
+            result = en_chunk
+            # Çeviri yok → EN chunk hazır olunca MPV'yi aç
+            if not ready_sent and on_ready:
+                on_ready(en_srt_path)
+                ready_sent = True
+                _reload_mpv_subs(en_srt_path)
+            else:
+                _reload_mpv_subs(en_srt_path)
+
+        blk_count += len(result)
+        translated = result
+
+        # İptal kontrolü — her chunk sonrası server'a sor
+        try:
+            import urllib.request as _ur
+            with _ur.urlopen("http://127.0.0.1:7373/cancel/check", timeout=1) as _r:
+                if _r.read().decode().strip() == "cancel":
+                    print("Pipeline iptal edildi.", flush=True)
+                    import shutil
+                    cache_dir = cache.path(video_id, "en").parent
+                    if cache_dir.exists():
+                        shutil.rmtree(cache_dir)
+                    raise SystemExit(0)
+        except SystemExit:
+            raise
+        except Exception:
+            pass
+
     for seg in segments:
         seg_count += 1
-        pending.append(
-            {
-                "num": str(seg_count),
-                "ts": f"{_fmt_ts(seg.start)} --> {_fmt_ts(seg.end)}",
-                "text": seg.text.strip(),
-            }
-        )
+        new_block = {
+            "num": str(seg_count),
+            "ts": f"{_fmt_ts(seg.start)} --> {_fmt_ts(seg.end)}",
+            "text": seg.text.strip(),
+        }
         if debug_lines is not None:
             debug_lines.append(
                 f"{seg_count}\n{_fmt_ts(seg.start)} --> {_fmt_ts(seg.end)}\n{seg.text.strip()}\n"
             )
-        if len(pending) >= STREAM_CHUNK:
-            chunk_num += 1
-            print(f"  Çeviri: chunk {chunk_num} ({seg_count} segment işlendi)")
-            ctx = [{"text": b["text"]} for b in translated[-CONTEXT_SIZE:]] if translated else None
-            translated = _translate_chunk(pool, pending, chunk_num, context=ctx, on_quota_event=_make_quota_callback(video_id))
-            translated = _renumber(translated, blk_count + 1)
-            _append_srt(srt_path, translated)
-            _status(stage="translating", chunk=chunk_num, video_id=video_id)
-            _reload_mpv_subs(srt_path)
-            blk_count += len(translated)
-            pending.clear()
-            if not ready_sent and on_ready:
-                on_ready(srt_path)
-                ready_sent = True
+        # A: Segment birleştirme
+        if pending:
+            last = pending[-1]
+            last_dur = _parse_duration(last["ts"])
+            last_chars = len(last["text"])
+            if last_dur < MERGE_MIN_DURATION or last_chars < MERGE_MIN_CHARS:
+                last_start = last["ts"].split(" --> ")[0]
+                new_end    = new_block["ts"].split(" --> ")[1]
+                pending[-1] = {
+                    "num":  last["num"],
+                    "ts":   f"{last_start} --> {new_end}",
+                    "text": last["text"] + " " + new_block["text"],
+                }
+                if debug_lines is not None:
+                    debug_lines[-1] = (
+                        f"{last['num']}\n{last_start} --> {new_end}\n"
+                        f"{last['text']} {new_block['text']}\n"
+                    )
+                continue
+        pending.append(new_block)
+
+        # B: Lookahead buffer dolunca flush
+        if len(pending) >= STREAM_CHUNK + LOOKAHEAD:
+            _flush_chunk(pending[:STREAM_CHUNK])
+            pending = pending[STREAM_CHUNK:]
 
     if debug_lines is not None:
-        debug_path = cache.path(video_id).with_name(f"{video_id}.en.srt")
-        debug_path.parent.mkdir(parents=True, exist_ok=True)
+        debug_path = cache.path(video_id, "en.debug")
         debug_path.write_text("\n".join(debug_lines), encoding="utf-8")
+
+    # Son chunk
     if pending:
-        chunk_num += 1
-        print(f"  Çeviri: chunk {chunk_num} (son)")
-        ctx = [{"text": b["text"]} for b in translated[-CONTEXT_SIZE:]] if translated else None
-        translated = _translate_chunk(pool, pending, chunk_num, context=ctx, on_quota_event=_make_quota_callback(video_id))
-        translated = _renumber(translated, blk_count + 1)
-        _append_srt(srt_path, translated)
-        _status(stage="translating", chunk=chunk_num, video_id=video_id)
-        _reload_mpv_subs(srt_path)
+        _flush_chunk(pending, is_last=True)
+        pending = []
 
     del model
     gc.collect()
-    cache.write(video_id, srt_path.read_text(encoding="utf-8"))
+
     if not ready_sent and on_ready:
-        on_ready(srt_path)
+        # Hiç chunk flush olmadıysa (çok kısa video) doğru path'i seç
+        fallback = tr_srt_path if (do_translate and tr_srt_path) else en_srt_path
+        on_ready(fallback)
     _status(stage="ready", video_id=video_id)
-    print(f"Tamamlandı → {srt_path}")
-    return srt_path
+    final_path = tr_srt_path if (do_translate and tr_srt_path) else en_srt_path
+    print(f"Tamamlandı → {final_path}")
+    return final_path

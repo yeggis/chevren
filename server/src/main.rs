@@ -32,6 +32,8 @@ async fn main() {
         )
         .route("/mpv/command", post(routes::mpv_cmd::handler))
         .route("/restart", post(routes::restart::handler))
+        .route("/config/lang", post(routes::config_lang::handler))
+        .route("/cancel/check", get(routes::cancel::check_handler))
         .with_state(shared_state)
         .layer(cors);
 
