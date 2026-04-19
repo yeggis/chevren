@@ -8,9 +8,9 @@
 **Local Whisper transcription + Gemini API translation → Turkish subtitles**
 
 [![AUR](https://img.shields.io/badge/AUR-chevren-blue?logo=archlinux&logoColor=white)](https://aur.archlinux.org/packages/chevren)
-[![Firefox Extension](https://img.shields.io/badge/Firefox-Extension%20v0.1.2-orange?logo=firefox)](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.2)
+[![Firefox Extension](https://img.shields.io/badge/Firefox-Extension%20v0.1.4-orange?logo=firefox)](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.4)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.19-brightgreen)](https://github.com/yeggis/chevren/releases)
+[![Version](https://img.shields.io/badge/version-1.0.20-brightgreen)](https://github.com/yeggis/chevren/releases)
 
 🇹🇷 [Türkçe README](README-tr.md)
 
@@ -161,17 +161,17 @@ Subtitles are cached under `~/.cache/chevren/<video_id>/` as `en.srt` (transcrip
 
 Adds a status strip below the YouTube video title and an ▶ button in the player controls to open the video in MPV.
 
-**Firefox (recommended) — Install via AMO (v0.1.2):**
-1. Download `chevren.xpi` from the [Releases page](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.2)
+**Firefox (recommended) — Install via AMO:**
+1. Visit the [Releases page](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.4) and download `chevren.xpi`
 2. Open `about:addons` in Firefox
 3. Gear icon → "Install Add-on From File" → select `chevren.xpi`
 
-**Chromium-based browsers (Chrome, Edge, Brave) — manual install:**
-1. Download and unzip the extension from the [Releases page](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.2)
+**Chromium-based browsers (Chrome, Edge, Brave, Helium) — manual install:**
+1. Download `chevren-extension-chrome.zip` from the [Releases page](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.4) and unzip it
 2. Open `chrome://extensions` → enable "Developer mode"
 3. "Load unpacked" → select the unzipped folder
 
-> ⚠️ Chromium-based browsers work but do not receive automatic updates — manual reinstall required on each update.
+> ⚠️ Chromium-based browsers do not receive automatic updates — manual reinstall required on each update.
 
 **What the strip does:**
 - Idle → click to start subtitle generation

@@ -16,7 +16,17 @@ aur-update:
 		git push
 
 release:
-	rm -f dist/chevren-extension.zip
+	rm -f dist/chevren-extension.zip dist/chevren-extension-firefox.zip dist/chevren-extension-chrome.zip
 	mkdir -p dist
-	cd extension && zip -r ../dist/chevren-extension.zip . -x "*.zip"
+	cd extension && zip -r ../dist/chevren-extension-firefox.zip . -x "*.zip"
+	cd extension && \
+		tmp=$$(mktemp -d) && \
+		cp -r . $$tmp/ && \
+		cd $$tmp && \
+		node -e "const fs=require('fs');const m=JSON.parse(fs.readFileSync('manifest.json'));delete m.background.scripts;fs.writeFileSync('manifest.json',JSON.stringify(m,null,2));" && \
+		zip -r $(CURDIR)/dist/chevren-extension-chrome.zip . -x "*.zip" && \
+		rm -rf $$tmp
+	cp dist/chevren-extension-firefox.zip dist/chevren-extension.zip
+	@echo "dist/chevren-extension-firefox.zip (AMO) hazır"
+	@echo "dist/chevren-extension-chrome.zip (Chrome/manuel) hazır"
 	@echo "dist/chevren-extension.zip hazır"

@@ -6,9 +6,9 @@
 **Yerel Whisper transkripsiyon + Gemini API çevirisi → Türkçe altyazı**
 
 [![AUR](https://img.shields.io/badge/AUR-chevren-blue?logo=archlinux&logoColor=white)](https://aur.archlinux.org/packages/chevren)
-[![Firefox Eklentisi](https://img.shields.io/badge/Firefox-Eklenti%20v0.1.2-orange?logo=firefox)](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.2)
+[![Firefox Eklentisi](https://img.shields.io/badge/Firefox-Eklenti%20v0.1.4-orange?logo=firefox)](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.4)
 [![Lisans](https://img.shields.io/badge/lisans-MIT-green)](LICENSE)
-[![Sürüm](https://img.shields.io/badge/sürüm-1.0.19-brightgreen)](https://github.com/yeggis/chevren/releases)
+[![Sürüm](https://img.shields.io/badge/sürüm-1.0.20-brightgreen)](https://github.com/yeggis/chevren/releases)
 
 🇬🇧 [English README](README.md)
 
@@ -158,10 +158,17 @@ Altyazılar `~/.cache/chevren/<video_id>/` dizini altında `en.srt` (transkript)
 
 YouTube video başlığının altına bir durum şeridi ve oynatıcı kontrollerine videoyu MPV'de açmak için bir ▶ düğmesi ekler.
 
-**Kurulum (v0.1.2):**
-1. [Releases sayfasından](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.2) `chevren.xpi` dosyasını indirin
+**Firefox (önerilen) — AMO üzerinden kurulum:**
+1. [Releases sayfasından](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.4) `chevren.xpi` dosyasını indirin
 2. Firefox'ta `about:addons` sayfasını açın
 3. Dişli ikonu → "Eklentiyi Dosyadan Yükle" → `chevren.xpi` seçin
+
+**Chromium tabanlı tarayıcılar (Chrome, Edge, Brave, Helium) — manuel kurulum:**
+1. [Releases sayfasından](https://github.com/yeggis/chevren/releases/tag/ext-v0.1.4) `chevren-extension-chrome.zip` dosyasını indirip açın
+2. `chrome://extensions` sayfasını açın → "Geliştirici modu"nu etkinleştirin
+3. "Paketlenmemiş öğe yükle" → açtığınız klasörü seçin
+
+> ⚠️ Chromium tabanlı tarayıcılar otomatik güncelleme almaz — her güncellemede manuel yeniden kurulum gerekir.
 
 **Durum şeridi ne yapar:**
 - Boşta → tıklayarak altyazı oluşturmayı başlatın
