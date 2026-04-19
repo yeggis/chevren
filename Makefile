@@ -29,4 +29,3 @@ release:
 	cp dist/chevren-extension-firefox.zip dist/chevren-extension.zip
 	@echo "dist/chevren-extension-firefox.zip (AMO) hazır"
 	@echo "dist/chevren-extension-chrome.zip (Chrome/manuel) hazır"
-	@echo "dist/chevren-extension.zip hazır"
